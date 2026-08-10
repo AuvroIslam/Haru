@@ -24,7 +24,7 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field
 
 from haru.brain.models import _new_id
-from haru.brain.provenance import utcnow
+from haru.brain.provenance import today as local_today, utcnow
 
 
 class Kind(str, Enum):
@@ -133,13 +133,13 @@ class Opportunity(BaseModel):
 
     @property
     def is_expired(self) -> bool:
-        return self.deadline is not None and self.deadline < utcnow().date()
+        return self.deadline is not None and self.deadline < local_today()
 
     @property
     def days_left(self) -> int | None:
         if self.deadline is None:
             return None
-        return (self.deadline - utcnow().date()).days
+        return (self.deadline - local_today()).days
 
     @property
     def is_urgent(self) -> bool:
@@ -186,7 +186,7 @@ def extract_deadline(text: str, *, today: date | None = None) -> date | None:
     company's founding year, a start date — and treating any of them as the
     deadline would put a wrong reminder in the user's calendar.
     """
-    reference = today or utcnow().date()
+    reference = today or local_today()
 
     relative = re.search(r"(\d+)\s+days?\s+(?:left|remaining|to go)", text, re.I)
     if relative:

@@ -21,7 +21,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_core import PydanticUndefined
 
-from haru.brain.provenance import Attested, Provenance, utcnow
+from haru.brain.provenance import Attested, Provenance, today, utcnow
 
 DEFAULT_PROFILE_ID = "default"
 
@@ -287,7 +287,7 @@ class Credential(BrainRecord):
     def is_expired(self, on: date | None = None) -> bool:
         if self.expiry_date is None:
             return False
-        return self.expiry_date < (on or utcnow().date())
+        return self.expiry_date < (on or today())
 
 
 class WritingSample(BrainRecord):

@@ -10,7 +10,7 @@ review queue; the user confirms them before they can back a claim in a document.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from enum import Enum
 from typing import Generic, TypeVar
 
@@ -22,6 +22,21 @@ T = TypeVar("T")
 def utcnow() -> datetime:
     """Timezone-aware UTC now. Naive datetimes cause silent ordering bugs."""
     return datetime.now(timezone.utc)
+
+
+def today() -> date:
+    """The user's *local* calendar date, for deadlines and expiry.
+
+    Deliberately not ``utcnow().date()``. A deadline of "30 September" and a
+    passport expiring "on the 12th" are calendar facts in the place the user
+    lives, and comparing them against a UTC date puts the answer out by a day
+    for anyone east or west of Greenwich — which, for a deadline, means telling
+    someone they still have time when they do not.
+
+    Every expiry comparison in the codebase goes through here so the two
+    notions of "today" cannot drift apart again.
+    """
+    return datetime.now().date()
 
 
 class Source(str, Enum):

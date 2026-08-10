@@ -32,7 +32,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from pydantic import BaseModel, ConfigDict, Field
 
 from haru.brain.models import DEFAULT_PROFILE_ID, _new_id
-from haru.brain.provenance import Provenance, utcnow
+from haru.brain.provenance import Provenance, today, utcnow
 
 KEY_FILENAME = "vault.key"
 BLOB_DIRNAME = "blobs"
@@ -111,7 +111,7 @@ class Document(BaseModel):
     def is_expired(self, on: date | None = None) -> bool:
         if self.expiry_date is None:
             return False
-        return self.expiry_date < (on or utcnow().date())
+        return self.expiry_date < (on or today())
 
     def expires_within(
         self, horizon: timedelta = DEFAULT_EXPIRY_HORIZON, on: date | None = None
@@ -119,7 +119,7 @@ class Document(BaseModel):
         """True when expiry is imminent (or already past)."""
         if self.expiry_date is None:
             return False
-        return self.expiry_date <= (on or utcnow().date()) + horizon
+        return self.expiry_date <= (on or today()) + horizon
 
 
 def _load_or_create_key(path: Path) -> bytes:

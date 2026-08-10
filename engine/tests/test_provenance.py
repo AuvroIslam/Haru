@@ -76,6 +76,28 @@ class TestProvenance:
         assert Provenance.entered().recorded_at.tzinfo is not None
 
 
+class TestToday:
+    """Deadlines and expiry are local calendar facts, not UTC ones."""
+
+    def test_today_is_the_local_date(self):
+        from datetime import datetime
+
+        from haru.brain.provenance import today
+
+        assert today() == datetime.now().date()
+
+    def test_today_may_differ_from_the_utc_date(self):
+        """The bug this guards: mixing the two puts expiry out by a day.
+
+        East of Greenwich after midnight local, ``utcnow().date()`` is still
+        yesterday — so a deadline that has passed still looks open.
+        """
+        from haru.brain.provenance import today, utcnow
+
+        difference = abs((today() - utcnow().date()).days)
+        assert difference <= 1, "sanity: the two can differ by at most a day"
+
+
 class TestAttested:
     def test_entered_value_is_confirmed(self):
         a = Attested.entered("Ada Lovelace")
