@@ -76,7 +76,7 @@ haru/
 │   │   │       ├── devpost.py
 │   │   │       └── linkedin_export.py
 │   │   ├── vault/                   # M0 — encrypted documents, expiry
-│   │   ├── validation/              # M1 — BUILD BEFORE ANY GENERATION
+│   │   ├── validation/              # seam in M0, implemented in M3, required before M4
 │   │   │   ├── fact_boundary.py
 │   │   │   ├── cliche.py
 │   │   │   ├── leakage.py
@@ -131,27 +131,14 @@ haru/
 - CV parsing (PDF + DOCX)
 - Encrypted vault with expiry tracking
 - JSON export
+- `fact_boundary` data model (part of the schema regardless of when the validator lands)
+- **Validation seam** — `validate(artifact, brain) -> Result`, called by every generation path.
+  Stub passes everything and logs. M3 fills it in without touching call sites. See PRD §17.1.
 
 **Watch for:** CV parsing quality varies wildly. Don't chase perfect extraction — the review
 queue is the safety net. Ship "reviewable" before "accurate."
 
-### M1 — Fact boundary *(before any generation exists)*
-
-**Done when:** text claiming an unowned skill is reliably blocked, proven by adversarial tests.
-
-- `allowed_skills` derived from `skills[]` + evidence links
-- Blocking check against orgs, projects, institutions, metrics
-- **Credentials: exact match against `credentials[]` with a document, no fuzzy allowance**
-- Cliché list (seed from ApplyPilot's, extend)
-- Leakage phrases — always blocking
-- Modes: strict / normal / lenient — the fact-boundary check is **not** relaxable in any mode
-- Regenerate-with-feedback loop, capped, then escalate to the user
-
-**Test approach:** a corpus of deliberate fabrications — invented certs, inflated metrics,
-plausible-but-unowned frameworks, fabricated employers. Aim for zero escapes on the blocking
-checks. This is the test suite that matters most in the whole product.
-
-### M2 — CV engine
+### M1 — CV engine
 
 **Done when:** two different jobs produce two different CVs with byte-identical styling.
 
@@ -164,7 +151,7 @@ checks. This is the test suite that matters most in the whole product.
 
 **Watch for:** scope creep into a CV builder. Haru selects and arranges; it is not a design tool.
 
-### M3 — Execution core
+### M2 — Execution core
 
 **Done when:** a React-based ATS form is filled with every field verified.
 
@@ -179,6 +166,28 @@ checks. This is the test suite that matters most in the whole product.
 - DOM → vision fallback
 
 **Watch for:** this is where the hard bugs live. Budget more than feels reasonable.
+
+### M3 — Fact boundary *(must ship before M4 — nothing goes out without it)*
+
+**Done when:** text claiming an unowned skill is reliably blocked, proven by adversarial tests.
+
+- `allowed_skills` derived from `skills[]` + evidence links
+- Blocking check against orgs, projects, institutions, metrics
+- **Credentials: exact match against `credentials[]` with a document, no fuzzy allowance**
+- Cliché list (seed from ApplyPilot's, extend)
+- Leakage phrases — always blocking
+- Modes: strict / normal / lenient — the fact-boundary check is **not** relaxable in any mode
+- Regenerate-with-feedback loop, capped, then escalate to the user
+- Replace the M0 stub behind the seam; no call sites change
+
+**Test approach:** a corpus of deliberate fabrications — invented certs, inflated metrics,
+plausible-but-unowned frameworks, fabricated employers. Aim for zero escapes on the blocking
+checks. This is the test suite that matters most in the whole product.
+
+**Because this now lands after M1/M2:** review the seam logs from those milestones before
+writing the validator. They record what generation actually produced, which is better evidence
+than guessing. Then hold the line that the validator judges the output, not the reverse — if
+existing M1 output fails, fix the generator, don't loosen the check.
 
 ### M4 — Job adapter
 
@@ -251,8 +260,10 @@ scaffolding only.
 1. Decide the open questions in PRD §20 that block M0 — specifically license and whether the
    Brain is single or multi-profile (it changes the schema).
 2. Scaffold `engine/` and get the API skeleton running.
-3. Write the Brain schema from PRD §6.2.
-4. Build the adversarial fabrication corpus **before** the validator, so M1 has a real target.
+3. Write the Brain schema from PRD §6.2, including `fact_boundary` and the validation seam.
+4. Build the adversarial fabrication corpus **now**, not at M3. It costs nothing but writing
+   text, it makes M3 a target rather than a guess, and it stops the validator being graded by
+   tests written after it.
 
 ---
 

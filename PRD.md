@@ -71,11 +71,22 @@ Haru's defensible ground, in order of strength:
 
 ### What we are explicitly not competing on
 
-**Volume.** AIHawk drew sustained press criticism (TechCrunch, Wired, The Verge, 404 Media —
-*"AI is enabling job seekers to think like spammers"*; one reporter auto-applied to 2,843
-roles). ApplyPilot leads with "1,000 jobs in 2 days." That framing invites the same backlash
-and degrades the thing users actually want, which is to get hired. Haru optimizes quality per
-submission and treats rate limiting as a feature.
+**Throughput at the expense of tailoring.** AIHawk drew sustained press criticism (TechCrunch,
+Wired, The Verge, 404 Media — *"AI is enabling job seekers to think like spammers"*; one
+reporter auto-applied to 2,843 roles). ApplyPilot leads with "1,000 jobs in 2 days."
+
+The distinction Haru draws is **count vs. care**, not a cap on count. Applying to 200 roles is a
+rational response to a brutal market. Sending 200 identical submissions is what produces the
+backlash and the poor outcomes. Haru will happily work through a large queue — each item gets
+the full pipeline, takes real time, and produces genuinely different material. What it won't do
+is skip the work to go faster.
+
+Two honest consequences of high volume, neither of which tailoring solves:
+
+1. **Detection risk scales with request count**, regardless of how good each application is.
+   Human pacing and session reuse (P7) mitigate but do not eliminate this.
+2. **Approval becomes the bottleneck.** 200 submissions means 200 approvals. The pressure to
+   batch-approve is real and is exactly how silent submission creeps in — see §14.4.
 
 ---
 
@@ -276,7 +287,7 @@ PersonalBrain
 │   ├── cv_templates[]           → see §11
 │   ├── tone: formal | warm | direct | academic
 │   ├── target_roles[], target_industries[], excluded_companies[]
-│   └── rate_limit: max submissions per day (default: low, deliberately)
+│   └── pacing: request spacing + optional daily cap (user-set; off by default)
 │
 └── fact_boundary        ← THE ANTI-FABRICATION CONTRACT (§10.2)
     ├── allowed_skills[]         (derived from skills[] + evidence)
@@ -709,6 +720,28 @@ the confirmation, full action log, and models used. Exportable.
 This matters most for government forms, where "what exactly did I submit and when" is a question
 with real consequences.
 
+### 14.4 Batch review — approval at volume
+
+If a user is working through 200 applications, a one-at-a-time modal is unusable, and an unusable
+gate gets removed. The answer is to make review *efficient*, not optional.
+
+**Batch review queue.** Prepared submissions stack up; the user reviews them in a session:
+
+- One screen per submission: fit score, the CV diff, generated answers, documents to upload
+- **Sorted by attention needed** — low-confidence fields, fact-boundary near-misses, and unusual
+  questions float to the top; routine ones sink
+- Keyboard-driven: approve / edit / reject / skip
+- **Bulk-approve is allowed only for the routine tail** — submissions with no flags, all fields
+  high-confidence, and a clean validation pass. Anything flagged must be opened individually.
+- Running summary: *"18 approved, 3 edited, 1 rejected, 2 need your input"*
+
+**What does not change:** a human still sees every submission before it goes out. Bulk-approve
+compresses the interaction for the boring cases; it does not skip them, and it is never the
+default for anything the system is unsure about.
+
+This is the honest middle between "200 modals" and "auto-submit," and it is the pressure valve
+that keeps §19's no-silent-submission rule survivable at scale.
+
 ---
 
 ## 15. Tracker & the Outcome Loop
@@ -776,10 +809,10 @@ No dates — sequenced by dependency. Each milestone ends in something demonstra
 
 | # | Milestone | Done when |
 | --- | --- | --- |
-| **M0** | **Brain core** — schema, local encrypted storage, CV import, review queue, provenance | You can import a CV and get a reviewable, confirmed record |
-| **M1** | **Fact boundary** — validator with all three checks, plus tests with deliberate fabrication attempts | Generated text containing an unowned skill is reliably blocked |
-| **M2** | **CV engine** — template/content split, import paths, tailoring, diff review, PDF render | Two jobs produce two different CVs, identical design |
-| **M3** | **Execution core** — action registry, one-action loop, post-action verification, native setter, loop guard, kill switch, session persistence | A React-based ATS form is filled and every field verified |
+| **M0** | **Brain core** — schema (incl. `fact_boundary` data), local encrypted storage, CV import, review queue, provenance, **validation seam** (§17.1) | You can import a CV and get a reviewable, confirmed record |
+| **M1** | **CV engine** — template/content split, import paths, tailoring, diff review, PDF render | Two jobs produce two different CVs, identical design |
+| **M2** | **Execution core** — action registry, one-action loop, post-action verification, native setter, loop guard, kill switch, session persistence | A React-based ATS form is filled and every field verified |
+| **M3** | **Fact boundary** — validator with all three checks, plus adversarial fabrication tests | Generated text containing an unowned skill is reliably blocked |
 | **M4** | **First adapter: job applications** — extraction, matching, generation, approval, evidence | End-to-end application on Greenhouse and Lever, human-approved |
 | **M5** | **Local model router** — probe, tiers, T0–T2, cost meter, privacy enforcement | Full application completes with no API key and $0 cost |
 | **M6** | **Adapter: hackathon submissions** — repo ingestion, story generation, repo-grounded validation, Devpost | A real submission drafted from a real repo, with inflated claims caught |
@@ -790,8 +823,21 @@ No dates — sequenced by dependency. Each milestone ends in something demonstra
 | **M11** | **Chat surface** — forwarding, Q&A, remote approval | A submission approved from a phone, away from the desk |
 | **M12** | **Generic form adapter** — the open-ended fallback | An unseen form type completes with human help |
 
-**M1 before M2 is deliberate.** The validator must exist before anything generates text that
-could reach a form.
+### 17.1 The validation seam
+
+The validator (M3) is built after the CV engine (M1), by decision. To keep that from becoming a
+retrofit that gets bent to fit existing output, two things land in **M0**:
+
+1. **The `fact_boundary` data model** — it's part of the Brain schema anyway (§6.2).
+2. **A validation seam.** Every generation path calls `validate(artifact, brain) -> Result`
+   from day one. Until M3 it is a stub that passes everything and logs what it saw.
+
+Consequences: M3 fills in an implementation without touching a single call site, and the logs
+from M1–M2 become free training data for what the validator actually needs to catch.
+
+**The one hard constraint that survives the reordering:** M3 ships before M4. Nothing is ever
+submitted to a third party in the user's name without passing the fact boundary. Generating a
+draft the user reads is a different risk class from sending it to an employer.
 
 ---
 
@@ -815,7 +861,11 @@ could reach a form.
 
 Stated so they don't creep back in:
 
-- **Mass-volume application mode.** No "apply to 500 jobs." Rate limits are a feature.
+- **Untailored bulk submission.** Volume itself is not the problem — a serious job search may
+  genuinely require hundreds of applications, and capping that would be paternalistic. What we
+  don't build is the spray-and-pray path: the same generic material dumped everywhere. Every
+  submission goes through the full pipeline — extract, match, tailor, validate, approve — however
+  many there are. Throughput is bounded by doing the work properly, not by an arbitrary limit.
 - **Credential storage or login automation.** Session reuse only.
 - **Detection-evasion machinery.** Not an arms race we should be in.
 - **Fabrication, in any mode.** No "creative" setting that relaxes the fact boundary.
