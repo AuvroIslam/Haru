@@ -115,6 +115,19 @@ class TestFalsePositiveRegressions:
     def test_generic_tech_vocabulary_is_ignored(self, validator):
         assert check(validator, "Built REST APIs in Python returning JSON.").passed
 
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "Served over ASGI with FastAPI.",
+            "Streams updates over SSE.",
+            "Uses JWT for auth alongside Python.",
+            "Reads the DOM with Python.",
+        ],
+    )
+    def test_protocol_and_interface_names_are_not_claims(self, validator, text):
+        """Found by a real model: 'built on ASGI' with FastAPI is accurate."""
+        assert check(validator, text).passed, text
+
     def test_spelling_aliases_resolve(self, validator):
         assert check(validator, "Deep experience with postgres and DOCKER.").passed
 
