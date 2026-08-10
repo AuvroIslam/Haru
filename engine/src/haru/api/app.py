@@ -24,7 +24,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -34,6 +39,7 @@ from haru.api.registry import (
     Decision,
     NotSubmittable,
 )
+from haru.api.runs import RunManager, stream
 from haru.brain.review import ReviewQueue
 from haru.brain.store import BrainStore
 from haru.validation.seam import is_stubbed
@@ -46,6 +52,7 @@ STATIC = HERE / "static"
 def create_app(
     store: BrainStore | None = None,
     registry: ApprovalRegistry | None = None,
+    runs: RunManager | None = None,
 ) -> FastAPI:
     """Build the app. Dependencies are injected so tests need no globals."""
     app = FastAPI(title="Haru", docs_url=None, redoc_url=None)
@@ -54,6 +61,7 @@ def create_app(
     # __len__, so an empty one is falsy and the caller's registry would be
     # silently replaced — approvals would submit into an object nothing reads.
     app.state.registry = registry if registry is not None else ApprovalRegistry()
+    app.state.runs = runs if runs is not None else RunManager()
 
     templates = Jinja2Templates(directory=str(TEMPLATES))
     app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
@@ -154,6 +162,26 @@ def create_app(
             elif action == "reject":
                 queue.reject(target)
         return RedirectResponse("/brain", status_code=303)
+
+    # ── live runs ────────────────────────────────────────────────────────
+
+    @app.get("/run/{run_id}", response_class=HTMLResponse)
+    def show_run(request: Request, run_id: str) -> HTMLResponse:
+        run = app.state.runs.get(run_id)
+        if run is None:
+            return page(request, "missing.html", what="run")
+        return page(request, "run.html", run=run, steps=run.as_events())
+
+    @app.get("/run/{run_id}/stream")
+    def run_stream(run_id: str):
+        run = app.state.runs.get(run_id)
+        if run is None:
+            return JSONResponse({"error": "not found"}, status_code=404)
+        return StreamingResponse(
+            stream(run),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     # ── json ─────────────────────────────────────────────────────────────
 

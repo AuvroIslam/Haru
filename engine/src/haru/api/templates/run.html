@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}{{ run.title }} — Haru{% endblock %}
+
+{% block content %}
+<h1>{{ run.title }}</h1>
+<p class="sub">
+  <span id="status" class="pill {{ 'warn' if run.is_running else 'ok' }}">
+    {{ "running" if run.is_running else (run.reason.value if run.reason else "finished") }}
+  </span>
+  {% if run.url %} <span class="meta">{{ run.url }}</span>{% endif %}
+</p>
+
+{# Rendered server-side first, so the timeline is complete and readable even
+   with scripting off — the stream only appends what happens next. #}
+<div class="card stack" id="timeline">
+  <table>
+    <tr><th>#</th><th>Action</th><th>Result</th></tr>
+    <tbody id="steps">
+      {% for step in steps %}
+      <tr>
+        <td class="conf">{{ step.index + 1 }}</td>
+        <td class="value">{{ step.action }}</td>
+        <td class="why">
+          {% if not step.performed %}<span class="pill stop">failed</span>
+          {% elif step.verified %}<span class="pill ok">verified</span>
+          {% else %}<span class="pill warn">unverified</span>{% endif %}
+          {% if step.note %} {{ step.note }}{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div id="empty" class="empty" {% if steps %}style="display:none"{% endif %}>
+    Waiting for the first action…
+  </div>
+</div>
+
+<p class="meta">
+  Every action is confirmed against the page before it counts. An action that
+  cannot be verified is treated as failed.
+</p>
+
+<script>
+// Inline and dependency-free: server-sent events need no library, and nothing
+// here is fetched from the network, so it works offline inside a webview.
+(function () {
+  var tbody = document.getElementById("steps");
+  var empty = document.getElementById("empty");
+  var status = document.getElementById("status");
+  var seen = tbody.children.length;
+
+  var source = new EventSource("/run/{{ run.id }}/stream");
+
+  source.addEventListener("step", function (message) {
+    var step = JSON.parse(message.data);
+    if (step.index < seen) return;
+    seen = step.index + 1;
+    empty.style.display = "none";
+
+    var badge = !step.performed
+      ? '<span class="pill stop">failed</span>'
+      : step.verified
+        ? '<span class="pill ok">verified</span>'
+        : '<span class="pill warn">unverified</span>';
+
+    var row = document.createElement("tr");
+    row.innerHTML =
+      '<td class="conf">' + (step.index + 1) + "</td>" +
+      '<td class="value"></td>' +
+      '<td class="why">' + badge + " <span></span></td>";
+    // textContent, not innerHTML — page content is untrusted input.
+    row.children[1].textContent = step.action;
+    row.children[2].querySelector("span:last-child").textContent = step.note || "";
+    tbody.appendChild(row);
+  });
+
+  source.addEventListener("done", function (message) {
+    var summary = JSON.parse(message.data);
+    status.textContent = summary.reason || "finished";
+    status.className = "pill ok";
+    source.close();
+  });
+
+  source.onerror = function () {
+    if (source.readyState === EventSource.CLOSED) {
+      status.textContent = "disconnected";
+      status.className = "pill";
+    }
+  };
+})();
+</script>
+{% endblock %}

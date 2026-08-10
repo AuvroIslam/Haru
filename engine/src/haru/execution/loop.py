@@ -152,10 +152,14 @@ class AgentLoop:
         step_cap: int = DEFAULT_STEP_CAP,
         kill_switch: KillSwitch | None = None,
         allow_submit_while_stubbed: bool = False,
+        on_step: Callable[[Step], None] | None = None,
     ) -> None:
         self.executor = executor
         self.decider = decider
         self.approval = approval
+        #: Called after each completed turn, so a UI can show progress live
+        #: rather than only a summary once the run finishes.
+        self.on_step = on_step
         self.budget = StepBudget(cap=step_cap)
         self.guard = LoopGuard()
         self.kill_switch = kill_switch or KillSwitch()
@@ -219,6 +223,13 @@ class AgentLoop:
             steps.append(step)
             if step.note:
                 notes.append(step.note)
+            if self.on_step is not None:
+                # A failing observer must not abort the run — it is a viewer,
+                # not a participant.
+                try:
+                    self.on_step(step)
+                except Exception:  # noqa: BLE001
+                    log.exception("on_step observer raised; continuing")
 
             if not step.performed:
                 return self._result(StopReason.FAILED, steps, notes)

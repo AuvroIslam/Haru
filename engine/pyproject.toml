@@ -17,6 +17,9 @@ dependencies = [
     "python-multipart>=0.0.9",
 ]
 
+[project.scripts]
+haru = "haru.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest",
