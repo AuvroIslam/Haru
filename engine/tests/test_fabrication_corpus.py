@@ -24,6 +24,21 @@ from haru.validation.types import Artifact, ArtifactKind, Check, ValidationMode
 CORPUS_PATH = Path(__file__).parent / "corpus" / "fabrications.json"
 
 
+@pytest.fixture(autouse=True)
+def _real_validator():
+    """Grade the M3 validator, not the stub.
+
+    Installed per-test rather than globally so the rest of the suite keeps
+    exercising the stubbed-submission interlock.
+    """
+    from haru.validation.seam import reset_validator, set_validator
+    from haru.validation.validator import FactBoundaryValidator
+
+    set_validator(FactBoundaryValidator())
+    yield
+    reset_validator()
+
+
 def load_corpus() -> dict:
     return json.loads(CORPUS_PATH.read_text(encoding="utf-8"))
 
