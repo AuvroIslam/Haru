@@ -120,7 +120,33 @@ class HighStakesReview:
         return not self.blockers()
 
     def preview(self) -> str:
-        lines = [DISCLAIMER, "", self.plan.preview(), "", self.progress]
+        # Deliberately not ``plan.preview()``: that opens with a job-fit score,
+        # which is meaningless on a visa form and actively confusing next to
+        # "0/10 — no overlap" when there is nothing to match against.
+        plan = self.plan
+        lines = [DISCLAIMER, "", f"Official form — {plan.url or 'unknown'}", ""]
+
+        if plan.to_fill:
+            lines.append(f"Will be entered ({len(plan.to_fill)}):")
+            lines.extend(f"  {f.label}: {f.match.value!r}" for f in plan.to_fill)
+            lines.append("")
+        if plan.to_ask:
+            lines.append(f"Needs you ({len(plan.to_ask)}):")
+            for entry in plan.to_ask:
+                known = f" [on file: {entry.match.value!r}]" if entry.match.value else ""
+                lines.append(f"  {entry.label}: {entry.reason}{known}")
+            lines.append("")
+        if plan.documents:
+            lines.append("Documents: " + ", ".join(plan.documents))
+            lines.append("")
+
+        blockers = self.blockers()
+        if blockers:
+            lines.append("NOT READY TO SUBMIT:")
+            lines.extend(f"  - {b}" for b in blockers)
+            lines.append("")
+
+        lines.append(self.progress)
         if self.pending:
             lines.append("Confirm each of these individually:")
             for entry in self.pending:
@@ -171,11 +197,17 @@ def build_government_plan(
             continue
         if entry.disposition is Disposition.FILL and entry.match.confidence >= 1.0:
             continue
+        # Don't restate it if the field's own rule already says so.
+        reason = (
+            entry.reason
+            if "identity-critical" in entry.reason
+            else f"identity-critical — confirm this yourself ({entry.reason})"
+        )
         plan.fields[index] = type(entry)(
             element=entry.element,
             match=entry.match,
             disposition=Disposition.ASK,
-            reason=f"identity-critical — confirm this yourself ({entry.reason})",
+            reason=reason,
         )
 
     return HighStakesReview(plan=plan)

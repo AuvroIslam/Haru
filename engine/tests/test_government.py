@@ -60,8 +60,9 @@ def form() -> PageSnapshot:
             Element(index=0, role=ElementRole.TEXTBOX, label="Full name", selector="#n", tag="input", required=True),
             Element(index=1, role=ElementRole.TEXTBOX, label="Email", selector="#e", tag="input"),
             Element(index=2, role=ElementRole.TEXTBOX, label="Passport number", selector="#p", tag="input", required=True),
-            Element(index=3, role=ElementRole.TEXTBOX, label="City", selector="#c", tag="input"),
-            Element(index=4, role=ElementRole.BUTTON, label="Submit", selector="#s", tag="button"),
+            Element(index=3, role=ElementRole.TEXTBOX, label="Date of birth", selector="#d", tag="input", required=True),
+            Element(index=4, role=ElementRole.TEXTBOX, label="City", selector="#c", tag="input"),
+            Element(index=5, role=ElementRole.BUTTON, label="Submit", selector="#s", tag="button"),
         ),
     )
 
@@ -195,6 +196,45 @@ class TestDisclaimer:
 
     def test_appears_in_the_preview(self, review):
         assert DISCLAIMER in review.preview()
+
+
+class TestPreview:
+    def test_does_not_show_a_job_fit_score(self, review):
+        """'0/10 — no overlap' is meaningless on a visa form."""
+        preview = review.preview()
+        assert "Fit:" not in preview
+        assert "no overlap" not in preview
+
+    def test_shows_the_value_on_file_for_fields_it_asks_about(self, review):
+        """Confirming a known value beats retyping a passport number."""
+        preview = review.preview()
+        assert "Date of birth" in preview
+        assert "on file:" in preview
+        assert "1990-12-10" in preview
+
+    def test_names_the_form(self, review):
+        assert "gov.uk" in review.preview()
+
+
+class TestDateOfBirth:
+    def test_is_never_auto_filled(self, store):
+        from haru.adapters.fields import FieldMapper as Mapper
+
+        match = Mapper.from_store(store).match("Date of birth")
+        assert match.always_ask
+        assert match.sensitive
+        assert not match.is_auto_fillable()
+
+    def test_surfaces_the_stored_value(self, store):
+        from haru.adapters.fields import FieldMapper as Mapper
+
+        assert Mapper.from_store(store).match("Date of birth").value == "1990-12-10"
+
+    @pytest.mark.parametrize("label", ["Date of Birth", "DOB", "Birth date"])
+    def test_label_variants(self, store, label):
+        from haru.adapters.fields import FieldMapper as Mapper
+
+        assert Mapper.from_store(store).match(label).canonical == "date_of_birth"
 
 
 class TestEvidenceRecord:

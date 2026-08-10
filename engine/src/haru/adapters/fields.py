@@ -126,6 +126,14 @@ RULES: tuple[Rule, ...] = (
     Rule("region", ("state", "province", "region", "county"), "region"),
     Rule("country", ("country",), "country"),
     Rule("postal_code", ("postal code", "zip code", "zip", "postcode"), "postal_code"),
+    Rule(
+        "date_of_birth",
+        ("date of birth", "birth date", "birthdate", "dob"),
+        "date_of_birth",
+        sensitive=True,
+        always_ask=True,
+        note="identity-critical — check this against your document",
+    ),
     Rule("linkedin", ("linkedin",), "linkedin"),
     Rule("github", ("github",), "github"),
     Rule("portfolio", ("portfolio", "website", "personal site"), "portfolio"),
@@ -355,6 +363,17 @@ class FieldMapper:
 
     def _resolve_current_salary(self) -> str | None:
         return None  # deliberately never proposed
+
+    def _resolve_date_of_birth(self) -> str | None:
+        """Shown for confirmation, never auto-filled — ``always_ask`` sees to that.
+
+        Surfacing the stored value beats making the user retype it: they are
+        checking a known value against a document rather than recalling it.
+        """
+        ident = self.view.identity
+        if ident is None or ident.date_of_birth is None:
+            return None
+        return _iso(ident.date_of_birth.value)
 
     def _resolve_gender(self) -> str | None:
         d = self.view.disclosure
