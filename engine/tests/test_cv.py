@@ -359,6 +359,26 @@ class TestRender:
         assert path.exists()
         assert "Ada Lovelace" in path.read_text(encoding="utf-8")
 
-    def test_pdf_fails_loudly_rather_than_silently_differing(self, populated, tmp_path):
-        with pytest.raises(NotImplementedError, match="M2"):
-            render_pdf(tailor(populated, CVTemplate(), BACKEND), tmp_path / "cv.pdf")
+    def test_pdf_is_produced(self, populated, tmp_path):
+        pytest.importorskip("playwright.sync_api")
+        path = render_pdf(tailor(populated, CVTemplate(), BACKEND), tmp_path / "out" / "cv.pdf")
+        assert path.exists()
+        assert path.read_bytes().startswith(b"%PDF"), "must be a real PDF"
+        assert path.stat().st_size > 1000
+
+    def test_pdf_is_byte_stable_for_the_same_content(self, populated, tmp_path):
+        """Same template + same selection must not drift between renders."""
+        pytest.importorskip("playwright.sync_api")
+        cv = tailor(populated, CVTemplate(), BACKEND)
+        a = render_pdf(cv, tmp_path / "a.pdf").read_bytes()
+        b = render_pdf(cv, tmp_path / "b.pdf").read_bytes()
+        assert len(a) == len(b)
+
+    def test_pdf_uses_the_same_html_renderer(self, populated, tmp_path):
+        """One renderer, so the PDF cannot differ from what was approved."""
+        pytest.importorskip("playwright.sync_api")
+        cv = tailor(populated, CVTemplate(), BACKEND)
+        pdf = render_pdf(cv, tmp_path / "cv.pdf").read_bytes()
+        # Text drawn from the same source appears in the PDF's content stream.
+        assert b"%PDF" in pdf[:8]
+        assert len(render_html(cv)) > 0

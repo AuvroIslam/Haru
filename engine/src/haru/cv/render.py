@@ -118,14 +118,38 @@ def write_html(cv: TailoredCV, path: Path | str, *, title: str | None = None) ->
     return target
 
 
-def render_pdf(cv: TailoredCV, path: Path | str) -> Path:
-    """Not implemented until the browser layer lands in M2.
+def render_pdf(cv: TailoredCV, path: Path | str, *, title: str | None = None) -> Path:
+    """Print the CV to PDF through headless Chrome.
 
-    Deliberately raises rather than falling back to a different renderer: a CV
-    that silently differs from what the user approved defeats the point of
-    pixel-stable output.
+    Deliberately the *same* renderer as :func:`render_html` — the PDF is that
+    HTML printed, not a second implementation. Two renderers means two
+    appearances, and the user only ever approves one of them.
+
+    Raises :class:`RuntimeError` rather than falling back to another engine if
+    Chromium is unavailable, for the same reason.
     """
-    raise NotImplementedError(
-        "PDF rendering needs headless Chrome, which arrives with the browser "
-        "layer in M2. Use render_html() until then."
-    )
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as exc:  # pragma: no cover - depends on install
+        raise RuntimeError(
+            "PDF rendering needs Playwright. Install it, or use render_html()."
+        ) from exc
+
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    html = render_html(cv, title=title)
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = browser.new_page()
+            page.set_content(html, wait_until="load")
+            page.pdf(
+                path=str(target),
+                format="A4",
+                print_background=True,
+                margin={"top": "0", "right": "0", "bottom": "0", "left": "0"},
+            )
+        finally:
+            browser.close()
+    return target
