@@ -173,25 +173,27 @@ def build_summary(
     through the validation seam so the observation log captures real generation
     during M1–M2 (PRD §17.1).
     """
-    experiences = store.list(Experience, profile_id=profile_id, confirmed_only=True)
+    # Rank by relevance, not storage order — a summary that leads with the
+    # wrong role undoes the point of tailoring.
+    ranked = select_experiences(store, ask, profile_id=profile_id)
     skills = [
         s
         for s in store.list(Skill, profile_id=profile_id, confirmed_only=True)
         if s.has_evidence
     ]
-    if not experiences and not skills:
+    if not ranked and not skills:
         return None
 
-    parts: list[str] = []
-    if experiences:
-        latest = experiences[0]
-        parts.append(f"{latest.title} at {latest.org}")
+    sentences: list[str] = []
+    if ranked:
+        lead = ranked[0]
+        sentences.append(f"{lead.title} at {lead.subtitle}")
     if skills:
         relevant = [s.name for s in select_relevant_skill_names(skills, ask)][:5]
         if relevant:
-            parts.append("works with " + ", ".join(relevant))
+            sentences.append("Works with " + ", ".join(relevant))
 
-    text = ". ".join(parts) + "." if parts else None
+    text = ". ".join(sentences) + "." if sentences else None
     if text:
         validate(
             Artifact(

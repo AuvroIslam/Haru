@@ -62,7 +62,7 @@ def populated(store):
             org="Cedar",
             title="Data Analyst",
             provenance=confirmed(),
-            technologies=["Excel", "Tableau"],
+            technologies=["JavaScript", "D3"],
         )
     )
     store.put(
@@ -229,6 +229,19 @@ class TestSummary:
     def test_built_from_confirmed_facts(self, populated):
         text = tailor(populated, CVTemplate(), BACKEND).section_for(Slot.SUMMARY).text
         assert "Northwind" in text
+
+    def test_leads_with_the_most_relevant_role(self, populated):
+        """A summary that opens with the wrong role undoes the tailoring."""
+        backend = tailor(populated, CVTemplate(), BACKEND).section_for(Slot.SUMMARY).text
+        frontend = tailor(populated, CVTemplate(), FRONTEND).section_for(Slot.SUMMARY).text
+        assert backend.startswith("Backend Engineer at Northwind")
+        assert frontend.startswith("Data Analyst at Cedar")
+
+    def test_sentences_are_well_formed(self, populated):
+        text = tailor(populated, CVTemplate(), BACKEND).section_for(Slot.SUMMARY).text
+        assert text.endswith(".")
+        for sentence in (s.strip() for s in text.split(".") if s.strip()):
+            assert sentence[0].isupper(), f"sentence not capitalised: {sentence!r}"
 
     def test_absent_when_brain_is_empty(self, store):
         assert tailor(store, CVTemplate(), BACKEND).section_for(Slot.SUMMARY) is None
