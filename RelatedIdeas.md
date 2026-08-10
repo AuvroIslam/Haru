@@ -522,6 +522,44 @@ Two consequences for us, neither of which our PRD acknowledged:
   than letting an LLM improvise every step, every time.
 * **Caveat from its own README:** "very early development, we don't recommend using this in production."
 
+## NaviNate — the opposite side of the transaction
+
+* **Type:** Hack the 6ix 2026 winner (Best Beginner Hack + Base44 challenge). ~5.6K LOC.
+* **Link:** [GitHub — katiehclau-art/NaviNate](https://github.com/katiehclau-art/NaviNate)
+* **What it is:** An embeddable voice-enabled widget a **company** installs on **its own** site to
+  guide **its** visitors. Vanilla JS widget + Node/Express backend + Base44 control plane +
+  ElevenLabs voice.
+
+**Why it matters strategically:** it is the same technology as a user-side browser agent, aimed
+the other way round. Because the site owner installs it, NaviNate has no bot-detection problem,
+no ToS problem, and no CDP fingerprint — it's just in-page JavaScript. It sidesteps the two
+risks that killed AIHawk by choosing a different side of the table. It is **not** a competitor to
+Haru (no personal brain, no documents, no cross-site identity), but it's a useful proof that
+positioning matters more than pipeline.
+
+**Four techniques verified in `widget/widget.js` (3,055 lines) and adopted in our PRD:**
+
+1. **One action per turn, then rescan.** `runTurn` deliberately executes only `data.actions[0]`
+   even when the model returns several. Its own comment: *"the real fix for the 'did it 4 times'
+   bug."* Blind multi-step plans go stale the moment the page changes.
+2. **Native value setter for framework-controlled inputs.** Plain `el.value = x` does not fire
+   React's synthetic `onChange`, so React state stays empty and the form submits blank while
+   looking filled. They use
+   `Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set` then dispatch
+   `input` + `change`. Greenhouse, Lever and Ashby are all React — this is not an edge case.
+3. **Loop guard on stable element IDs**, nudging the model forward a few times before giving up.
+4. **`sessionStorage` persistence across navigation** — page nav destroys the JS context, so goal,
+   history, undo stack and nav state are saved and the widget rebuilds on the destination page.
+
+**Their admitted top gap, which we treat as a principle:** no deterministic post-action
+verification. NaviNate reports success without confirming the field actually changed. It's the
+first item on their "what's next." This became **PRD P4 — verify, don't assume**.
+
+**Honest calibration:** beginner-category win; single model (`gpt-4o`, no fallback); 262-line
+crawler; Base44 is a sponsor-challenge dependency they'd need to unwind. Undo is also shallower
+than the writeup implies — form fields restore directly, but application state (cart contents)
+requires the host company to implement an adapter contract.
+
 ## Cognito — verified extension architecture
 
 * **Link:** [GitLab — codewarnab-group/cognito-ai](https://gitlab.com/codewarnab-group/cognito-ai)

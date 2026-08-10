@@ -1,864 +1,861 @@
-# Haru - Personal AI Web Agent
-## Comprehensive Product Requirements Document
+# Haru — Product Requirements Document
+
+**Status:** Draft 2.0 — full rewrite
+**Supersedes:** Draft 1.0 (job-application agent, scoped for a hackathon)
+**Last updated:** 2026-08-10
 
 ---
 
-## 1. Executive Summary
+## 1. What Haru is
 
-**Product Name:** Haru (Personal AI Web Agent)
+> **Haru holds your facts and your documents, and represents you on any form on the web.**
 
-**Vision:** Build an end-to-end AI agent that doesn't just automate websites, but *represents you on the web*. Users don't operate websites—they tell Haru what they want, and it figures out how to do it while staying true to who they are.
+Not a job-application bot. Not a browser agent. The product is the **identity layer** — a
+private, structured, verified record of who you are and what you've done — and a set of
+adapters that carry it onto whatever the web asks you to fill in.
 
-**Core Thesis:** 
-> You don't operate the website. You tell the agent the outcome you want, and it represents you on the web.
-
-**Example Use Case:**
-User: *"Apply to this internship"*
-Agent determines:
-1. What the company wants (job requirements)
-2. If you're a reasonable match (fit scoring)
-3. Which of your projects are relevant (semantic matching)
-4. Which CV version to create (tailored to opportunity)
-5. What application answers to generate (based on Personal Brain)
-6. How to navigate the website (browser automation)
-7. Which information it already knows (from Personal Brain)
-8. What information it still needs (asks user)
-9. What needs your approval (sensitive actions)
-10. What to submit (filled forms)
-11. What evidence to save (screenshots + audit log)
-
----
-
-## 2. Key Differentiators
-
-Unlike existing solutions, Haru combines three layers:
-
-### Layer 1: KNOWS YOU (Personal Brain)
-- Projects & project descriptions
-- Skills and expertise areas
-- Education and certifications
-- Experience and work history
-- Documents (CV, portfolio, certificates)
-- Personal preferences (CV style, application tone, industry preferences)
-- Past application attempts and outcomes (success patterns)
-
-### Layer 2: KNOWS THE TASK (Task Intelligence)
-- Goal/intent understanding ("Apply to job X" vs "Download file Y")
-- Opportunity analysis (parse job descriptions, extract requirements)
-- Match analysis (semantic matching between user and opportunity)
-- Context awareness (which Personal Brain data is relevant)
-
-### Layer 3: KNOWS THE WEB (Browser Agent)
-- Reliable browser automation (built on Browser Use)
-- DOM parsing + Vision fallback (handles complex websites)
-- Form field understanding (matches HTML fields to user data)
-- Multi-page workflow navigation
-- Error recovery and self-healing
-- Screenshot evidence capture
-
-**The Combination = Powerful & Differentiated**
-Not another "AI browser agent" (those exist: Browser Use, Cognito, REAL Agent)
-Not another "AI resume tailor" (those exist: Resume ArchiTech, ResumeTelling)
-But a **personal AI that knows you, knows the task, and knows the web** to do your applications end-to-end.
-
----
-
-## 3. User Personas
-
-### Primary User: Career-Stage Professionals
-- Age: 22-35 (internships, early-career roles, career transitions)
-- Pain: Spending hours on repetitive job applications across different websites
-- Goal: Apply to more opportunities without application fatigue
-- Motivation: Quality over quantity—better tailored applications
-
-### Secondary User: Career Switchers
-- Age: 30-50+ (changing industries, returning to work)
-- Pain: Unsure which past projects/skills are relevant to new field
-- Goal: Highlight transferable skills while staying authentic
-- Motivation: Confidence + speed in application process
-
-### Tertiary User: Portfolio-Heavy Applicants
-- Age: 22-40 (engineers, designers, creatives)
-- Pain: Manually tailoring portfolio + CV + answers for each application
-- Goal: Automated but authentic customization
-- Motivation: Show best projects for each opportunity
-
----
-
-## 4. Core Features
-
-### Tier 1 - MVP Features (Phase 1: Killer Demo)
-
-#### 4.1 Goal-Based Browser Automation
-**What:** User provides high-level goal; agent figures out the steps
-- *"Apply to this job link"*
-- *"Download the latest version of [software]"*
-- *"Fill out this form"*
-
-**How:**
-1. Parse user's natural-language goal
-2. Load the webpage
-3. Analyze DOM + take screenshot (vision fallback if needed)
-4. Break goal into step-by-step actions
-5. Execute with feedback loops
-
-**Technical Approach:**
-- Use Browser Use as foundation for automation
-- Orchestrator pattern: goal → planner → executor → validator
-- Reflection: "Did that work? If not, try another approach"
-
----
-
-#### 4.2 Smart Form Filling
-**What:** Agent reads entire form, matches fields to user's stored data, fills automatically
-- Extracts all form fields from DOM
-- Matches field labels to known user data types (name, email, phone, etc.)
-- Auto-fills with high confidence
-- Asks user only for unknown data
-- Handles different input types: text, select, radio, checkbox, file upload
-
-**Data Mapping:**
-```
-Form Field → User Data Type → Value
-"Full Name" → name → "Alice Chen"
-"Email Address" → email → "alice@example.com"
-"Phone" → phone → "+1-555-0123"
-"Your Background" → experience_summary → [from Personal Brain]
-```
-
----
-
-#### 4.3 Ask-When-Needed Intelligence
-**What:** Instead of overwhelming user, agent asks only for truly unknown information
-- Analyzes form before asking
-- Checks Personal Brain for matching data
-- Only asks for information it genuinely doesn't know
-- Smart follow-ups (e.g., if missing graduation year, asks "When did you graduate from X?")
-
-**Question Priority:**
-1. Can it be found in Personal Brain? (auto-fill)
-2. Can it be inferred from context? (ask with suggestion)
-3. Doesn't exist anywhere? (ask user)
-
----
-
-#### 4.4 DOM + Vision Fallback
-**What:** Start with reliable DOM parsing; fall back to vision when DOM is insufficient
-- First attempt: Parse form via HTML/DOM analysis
-- Detection: Is DOM insufficient? (hidden fields, dynamic elements, complex layouts)
-- Fallback: Take screenshot, use vision model to understand form
-- Advantage: Works on traditional websites AND complex SPAs
-
-**Use Cases:**
-- Traditional HTML forms → pure DOM
-- JavaScript-heavy applications → vision
-- Hidden/obfuscated forms → vision
-- PDF forms embedded in webpage → vision
-
----
-
-#### 4.5 Screenshot Evidence Capture
-**What:** Take screenshots after key actions for audit trail + user verification
-- Screenshot after form fill (before submit)
-- Screenshot after successful submission
-- Screenshot on error (for debugging)
-- User can review before approving submission
-
----
-
-#### 4.6 Approval Gates
-**What:** Agent can freely navigate and fill, but asks before critical actions
-- **Free actions:** Navigate, click, type, scroll, screenshot
-- **Approval required:** Submit, Send, Pay, Delete, Login (new account)
-- **Silent actions:** Fill forms, analyze pages
-
-**Flow:**
-```
-Agent: "Ready to submit application?"
-User: "Yes / No / Let me review"
-→ Show screenshot of filled form
-→ Allow edits if needed
-→ Then proceed with submission
-```
-
----
-
-### Tier 2 - Personal Brain Features (Phase 2)
-
-#### 4.7 Personal Brain - Data Storage
-**What:** Structured repository of user's professional information
-```
-Personal Brain
-├── Identity
-│   ├── Full name
-│   ├── Email
-│   ├── Phone
-│   └── Location
-├── Projects
-│   ├── Project name
-│   ├── Description
-│   ├── Technologies
-│   ├── GitHub/Link
-│   └── Impact metrics
-├── Skills
-│   ├── Technical skills (with proficiency levels)
-│   ├── Soft skills
-│   └── Certifications
-├── Experience
-│   ├── Job title
-│   ├── Company
-│   ├── Duration
-│   ├── Description
-│   └── Key achievements
-├── Education
-│   ├── School name
-│   ├── Degree
-│   ├── Graduation date
-│   └── GPA/honors
-├── Documents
-│   ├── Master CV
-│   ├── Certificates
-│   ├── Portfolio links
-│   └── Cover letter templates
-├── Preferences
-│   ├── CV style/design (formal, modern, creative)
-│   ├── Application tone (professional, enthusiastic, etc.)
-│   ├── Industry preferences
-│   └── Company size preferences
-│
-├── Work Authorization          ← REQUIRED, was missing
-│   ├── Legally authorized to work (Yes/No)
-│   ├── Requires sponsorship (Yes/No)
-│   └── Work permit type
-├── Availability                ← REQUIRED, was missing
-│   ├── Earliest start date
-│   ├── Open to full-time (Yes/No)
-│   └── Open to contract (Yes/No)
-├── Compensation                ← REQUIRED, was missing
-│   ├── Salary expectation
-│   ├── Range min / max
-│   └── Currency
-├── EEO Voluntary Disclosure    ← REQUIRED, was missing
-│   ├── Gender (default: decline to self-identify)
-│   ├── Race/ethnicity (default: decline to self-identify)
-│   ├── Veteran status
-│   └── Disability status
-├── Standard Answers            ← was missing
-│   ├── Age 18+ / background check consent / felony
-│   ├── Previously worked here
-│   └── How did you hear about us
-│
-└── Fact Boundary               ← ANTI-FABRICATION, was missing
-    ├── skills_boundary (the ONLY skills the LLM may claim)
-    ├── preserved_companies
-    ├── preserved_projects
-    ├── preserved_school
-    └── real_metrics (the only numbers the LLM may cite)
-```
-
-**Why the four "REQUIRED, was missing" blocks matter:** essentially every real job application
-asks for work authorization, availability, salary expectation, and EEO disclosure. An agent
-that cannot answer these cannot complete a single application unattended. This was verified
-against ApplyPilot's `profile.example.json` and AIHawk's `resume_schemas/`.
-
-**EEO handling is sensitive.** These are protected-characteristic questions. Defaults must be
-"decline to self-identify," the user must explicitly opt in to any other value, and these
-fields must never be sent to a cloud LLM.
-
----
-
-#### 4.7b Anti-Fabrication Validator (borrowed from ApplyPilot)
-
-**What:** Every LLM-generated resume, cover letter, or application answer is validated before
-it reaches a form. This is the difference between a useful assistant and one that lies on your
-behalf — lying on a job application is a real harm to the user.
-
-**Three checks, all profile-driven:**
-
-1. **Fact boundary.** The model may only claim skills in `skills_boundary`, companies in
-   `preserved_companies`, projects in `preserved_projects`, and numbers in `real_metrics`.
-   Reasonable adjacent tech is allowed; unrelated languages/frameworks are blocked.
-   **Certifications are never stretchable** — a claimed cert is either real or it's fraud.
-2. **Banned clichés.** ~50 phrases that make output read as machine-written: "passionate",
-   "spearheaded", "robust", "proven track record", "team player", "detail-oriented".
-3. **LLM leak detection.** Catches the model talking to itself in the deliverable:
-   "here is the revised…", "i apologize", "as requested", "note:".
-
-**Modes:** `strict` (violations force regeneration) / `normal` (clichés warn, fabrication
-errors) / `lenient` (fabrication only). Default `normal`.
-
-**Failure behavior:** regenerate up to N times, then surface to the user rather than
-submitting unvalidated content.
-
-**Data Entry Methods:**
-- Manual upload of CV/resume (parse to extract info)
-- GitHub profile import (pull projects + languages)
-- Manual form entry (guided workflow)
-- Document upload (PDFs, images → extract via OCR/vision)
-
----
-
-#### 4.8 Smart Project Selection
-**What:** Automatically choose most relevant projects for each opportunity
-- Parse job description → extract required skills/keywords
-- Analyze user's projects → extract skills/keywords
-- Semantic matching: Which projects showcase the right skills?
-- Rank by relevance to opportunity
-
-**Example:**
-```
-Job: "Seeking fullstack engineer for React+Node startup"
-Available projects:
-  • ChatApp (React, Node.js, WebSockets) - Score: 95%
-  • DataViz Dashboard (Python, Matplotlib) - Score: 30%
-  • CLI Tool (Go, REST APIs) - Score: 50%
-
-→ Auto-select ChatApp + highlight relevant parts
-```
-
----
-
-#### 4.9 Dynamic CV Generation
-**What:** Create tailored CV for each opportunity while preserving user's style
-- Start with master CV template
-- Reorder sections based on relevance (skills-first for technical job, experience-first for leadership)
-- Choose relevant projects/experiences
-- Customize bullet points to highlight relevant skills
-- Maintain original design/formatting preferences
-
-**Customization Layers:**
-1. Section reordering (what comes first?)
-2. Content selection (which projects/roles?)
-3. Bullet point tailoring (emphasize relevant achievements)
-4. Design preservation (keep user's CV aesthetic)
-
----
-
-#### 4.10 Application Answer Generation
-**What:** Generate answers for open-ended application questions using Personal Brain
-- Parse application question
-- Identify what skills/experiences it's asking for
-- Search Personal Brain for relevant stories/achievements
-- Generate compelling answer (maintain authenticity, use user's voice)
-
-**Example:**
-```
-Q: "Tell us about a time you solved a complex technical problem"
-
-Personal Brain Matching:
-→ "Optimized database queries → 10x performance improvement"
-→ Technologies: PostgreSQL, indexing, query analysis
-→ Context: worked on ChatApp project
-
-Generated Answer:
-"While building a real-time chat application, I discovered that 
-message queries were taking 2+ seconds. I analyzed query plans, 
-added strategic indexes, and implemented pagination. This reduced 
-query time to 50ms—a 40x improvement that allowed 10K+ concurrent 
-users without slowdown."
-```
-
----
-
-### Tier 3 - Communication & Control (Phase 3)
-
-#### 4.11 WhatsApp/Telegram Control
-**What:** Start tasks, answer questions, approve actions from phone
-- User sends message to bot: *"Apply to job: [link]"*
-- Agent responds with: *"Found role. Analysis shows good fit. Need 3 things: graduation date, visa status, availability. What are your answers?"*
-- User responds via chat
-- Agent continues and asks for approval before submitting
-- Agent sends confirmation + screenshot
-
-**Commands:**
-- `apply [link]` → Start application
-- `show profile` → Display Personal Brain summary
-- `add project [...]` → Quick project addition
-- `approve` / `reject` → Approve pending action
-- `status` → Current task status
-
----
-
-#### 4.12 Desktop Agent
-**What:** Runs actual browser + local files on user's computer
-- Not cloud-only: browser runs on user's machine
-- Enables local LLM usage (no API costs, privacy)
-- Can access local files, folders, screen
-- Sensitive data stays on-device
-
-**Architecture:**
-```
-Desktop App (Electron/Tauri)
-├── Local Browser (Playwright)
-├── Local LLM (Ollama/LlamaCpp)
-├── Personal Brain DB (SQLite/local)
-└── File System Access
-```
-
----
-
-#### 4.13 Privacy Mode
-**What:** Keep sensitive data local, use cloud only when appropriate
-- **Local processing:** Personal Brain queries, CV generation, local form filling
-- **Cloud when needed:** Complex NLP (understanding job descriptions), image understanding (if user allows)
-- **User control:** Can toggle privacy mode for individual tasks
-
-**Privacy-First Operations:**
-- Personal Brain never leaves device
-- CV generation on-device
-- Form analysis on-device
-- Only send to cloud: job description text (for analysis), screenshots (if explicitly enabled)
-
----
-
-### Tier 4 - Tracking & Memory (Phase 4)
-
-#### 4.14 Application Tracker
-**What:** Complete history of applications and results
-```
-Application Log Entry:
-├── Date Applied
-├── Company + Role
-├── Job URL
-├── Status (Applied, In Progress, Interview, Rejected, Offer)
-├── CV Version Used
-├── Answers Generated (archived)
-├── Screenshots (filled form, confirmation)
-├── Application Answers
-├── Follow-up Notes
-└── Outcome (if known)
-```
-
-**Use Cases:**
-- Track which companies you've applied to (avoid duplicates)
-- See which CV versions got interviews
-- Analyze which types of answers perform best
-- Build portfolio of your applications
-
----
-
-#### 4.15 Task Memory & Learning
-**What:** Remember workflows and learn from repetition
-- Store successful workflows (e.g., LinkedIn job application pattern)
-- Learn user's preferences over time
-- Speed up repeated tasks
-- Suggest improvements based on past attempts
-
-**Learning Examples:**
-- First application: Takes 5 minutes (agent asks questions, learns format)
-- Second similar application: Takes 2 minutes (reuses learned patterns)
-- Application answer that got interview: "Remember this worked well, use similar structure next time"
-
----
-
-#### 4.16 Error Recovery
-**What:** When something fails, analyze and adapt
-- Button didn't exist → retry with alternative selector
-- Page structure changed → re-analyze with vision
-- Form validation error → read error message, ask user for correction
-- Network timeout → retry with exponential backoff
-
-**Recovery Strategies:**
-1. Detect error (screenshot + compare to expected state)
-2. Analyze cause (missing element, different layout, validation error)
-3. Try alternative approach
-4. If all fail: escalate to user with screenshot + explanation
-
----
-
-#### 4.17 Activity Timeline
-**What:** Show user exactly what agent did, step-by-step
-```
-Activity Timeline for "Apply to Google UX Role"
-├── 14:32:00 - Started task
-├── 14:32:05 - Navigated to job posting
-├── 14:32:10 - Analyzed job requirements (Vue, React, UX research)
-├── 14:32:15 - Checked Personal Brain for relevant projects
-├── 14:32:20 - Selected "DesignSystem" project as most relevant
-├── 14:32:25 - Generated tailored CV (emphasized UX research)
-├── 14:32:30 - Filled form: Name, Email, Phone (auto-filled)
-├── 14:32:40 - Asking: "Years of UX research experience?" → User: 3
-├── 14:32:50 - Filled "Why Google?" answer
-├── 14:33:00 - Ready to submit? → User approved
-├── 14:33:05 - Submitted application
-├── 14:33:10 - Confirmed success (screenshot attached)
-```
-
----
-
-## 5. Technical Architecture
-
-### 5.1 High-Level System Design
+Job applications are the wedge because the pain is sharpest there. But a hackathon submission,
+a passport renewal, a university application, a visa form, a grant proposal, and a rental
+application are all the same shape underneath:
 
 ```
-┌─────────────────────────────────────────────┐
-│           USER INTERFACES                    │
-├──────────┬──────────────┬──────────────┬─────┤
-│ Chrome   │ WhatsApp/    │   Desktop    │ Web │
-│Extension │ Telegram Bot │   Electron   │App  │
-└──────────┴──────────────┴──────────────┴─────┘
-           │              │              │
-           └──────────────┼──────────────┘
+Something asks you for facts about yourself, plus prose about yourself,
+in its own idiosyncratic format, with a deadline.
+```
+
+You have answered those questions a hundred times. Haru answers them for you, from a record
+you own, without inventing anything, and shows you everything before it commits.
+
+### The thesis
+
+> You should type your own facts once, not once per form.
+> And nothing should ever be submitted in your name that you haven't seen and that isn't true.
+
+---
+
+## 2. Honest competitive position
+
+This section exists because the first draft of this PRD claimed novelty it didn't have.
+
+### What already exists and works
+
+| Project | What it covers | License |
+| --- | --- | --- |
+| [ApplyPilot](https://github.com/Pickle-Pixel/ApplyPilot) | Full job pipeline: discover → score → tailor → cover → auto-submit. 5 boards + 48 Workday portals. Production-grade. | AGPL-3.0 |
+| [AIHawk](https://github.com/feder-cr/jobs_applier_ai_agent_aihawk) | LinkedIn Easy Apply mass-apply. Now largely abandoned by its author. | MIT |
+| [Browser Use](https://github.com/browser-use/browser-use) | The browser automation substrate. ~93K stars. | MIT |
+| [workflow-use](https://github.com/browser-use/workflow-use) | Deterministic recorded workflows with LLM fallback + healing. | MIT |
+| [Cognito](https://gitlab.com/codewarnab-group/cognito-ai) | Chrome side-panel agent, local AI, MCP, action registry. | BUSL-1.1 — **source-available, not open source. Read only; do not copy code.** |
+| [NaviNate](https://github.com/katiehclau-art/NaviNate) | Site-side embedded concierge. Company installs it for its own visitors. | Hackathon project |
+
+**If we build "an AI agent that applies to jobs," we lose to ApplyPilot.** It is further along
+than we would be, and it is free. That is settled.
+
+### Where the room actually is
+
+Every project above treats the user profile as a *config file for one vertical*. ApplyPilot's
+is literally `profile.example.json`, scoped to job applications. Nobody has built the profile
+as the product.
+
+Haru's defensible ground, in order of strength:
+
+1. **Cross-domain identity.** One brain that fills a job application, a Devpost submission, and
+   a passport form. No competitor spans these.
+2. **A site-adapter library that compounds.** Recorded, self-healing workflows per target site.
+   Every failure permanently improves the system; every new adapter is a moat brick.
+3. **Verified-honest output.** Generation is bounded by facts the user has confirmed. Nothing is
+   invented. This is a *product* feature, not a compliance checkbox — see §3 and §10.
+4. **Local-first economics.** Free to run by default. Paid models are an opt-in upgrade, not a
+   dependency.
+5. **The outcome loop.** Which CV version got interviews. Nobody closes this.
+
+### What we are explicitly not competing on
+
+**Volume.** AIHawk drew sustained press criticism (TechCrunch, Wired, The Verge, 404 Media —
+*"AI is enabling job seekers to think like spammers"*; one reporter auto-applied to 2,843
+roles). ApplyPilot leads with "1,000 jobs in 2 days." That framing invites the same backlash
+and degrades the thing users actually want, which is to get hired. Haru optimizes quality per
+submission and treats rate limiting as a feature.
+
+---
+
+## 3. Principles
+
+These are non-negotiable and every design decision below traces back to one.
+
+**P1 — Never fabricate.** Haru may reorganize, re-emphasize, and rephrase facts the user has
+confirmed. It may never invent a skill, a metric, a date, a company, or a credential. Claiming
+a certification you don't hold is fraud, and Haru will not do it on your behalf even if asked.
+
+**P2 — The user owns the record.** The Personal Brain lives on the user's machine, in a format
+they can read and export. No lock-in. No silent cloud sync.
+
+**P3 — Show, then commit.** Nothing irreversible happens without the user seeing exactly what
+will be submitted. Approval gates are not optional for submit/send/pay/delete.
+
+**P4 — Verify, don't assume.** After every action, confirm the observable result before
+reporting success. NaviNate shipped without this and named it their top regret; we build it in
+from the start.
+
+**P5 — Deterministic first, model second.** If a recorded workflow can do it, don't spend a
+token. Models are for the unknown, not the routine.
+
+**P6 — Free by default.** The product must be fully usable with local models and no API key.
+
+**P7 — Work in the open, at human pace.** Haru operates in the user's own browser, in their own
+already-authenticated session. It does not store passwords, does not automate login, and does
+not enter a detection-evasion arms race. Where a site's terms forbid automation, the user is
+told plainly and decides — see §16.2.
+
+---
+
+## 4. Users
+
+### Primary — the serial applicant
+Applies to many things across many systems: jobs, hackathons, grants, programs. Pain is
+repetition and context-switching, not any single form.
+
+### Secondary — the document-burdened
+Immigrants, students, anyone dealing with government and institutional bureaucracy. Same forty
+facts, twenty forms, each with its own vocabulary and its own uploaded-document requirements.
+Stakes are higher and errors are costly.
+
+### Tertiary — the builder
+Ships projects, enters hackathons, maintains a portfolio. Needs their work described accurately
+and repeatedly, tuned to each audience.
+
+All three share one property: **they retype the same truths forever.**
+
+---
+
+## 5. The unified pipeline
+
+Every target type runs the same eight stages. Adapters differ; the pipeline does not.
+
+```
+ ┌─ 1. CAPTURE ────────────────────────────────────────────┐
+ │  A target enters the system (URL, forward, file, search) │
+ └────────────────────────┬────────────────────────────────┘
                           ↓
-        ┌──────────────────────────────┐
-        │    TASK ORCHESTRATOR         │
-        │ (Parse → Plan → Execute)     │
-        └──────────────┬───────────────┘
-                       ↓
-        ┌──────────────────────────────┐
-        │  THREE-LAYER INTELLIGENCE    │
-        ├──────────────────────────────┤
-        │ 1. Personal Brain (Know You)  │
-        │ 2. Task Planner (Know Task)   │
-        │ 3. Browser Agent (Know Web)   │
-        └──────────────┬───────────────┘
-                       ↓
-        ┌──────────────────────────────┐
-        │  EXECUTION ENGINES           │
-        ├──────────────────────────────┤
-        │ • Browser Automation         │
-        │ • Form Filling               │
-        │ • Document Processing        │
-        │ • LLM Inference              │
-        └──────────────┬───────────────┘
-                       ↓
-        ┌──────────────────────────────┐
-        │  STORAGE LAYER               │
-        ├──────────────────────────────┤
-        │ • Personal Brain (local DB)  │
-        │ • Application Logs           │
-        │ • Screenshots + Evidence     │
-        │ • Task Memory                │
-        └──────────────────────────────┘
+ ┌─ 2. UNDERSTAND ─────────────────────────────────────────┐
+ │  Classify target type. Extract its requirements into a   │
+ │  structured Ask: fields, questions, documents, deadline. │
+ └────────────────────────┬────────────────────────────────┘
+                          ↓
+ ┌─ 3. MATCH ──────────────────────────────────────────────┐
+ │  Retrieve relevant facts, documents, and past answers    │
+ │  from the Brain. Score fit. Flag what's missing.         │
+ └────────────────────────┬────────────────────────────────┘
+                          ↓
+ ┌─ 4. ASK ────────────────────────────────────────────────┐
+ │  Ask the user ONLY for what the Brain genuinely lacks.   │
+ │  Every answer is written back to the Brain.              │
+ └────────────────────────┬────────────────────────────────┘
+                          ↓
+ ┌─ 5. COMPOSE ────────────────────────────────────────────┐
+ │  Generate documents and prose, bounded by the Fact       │
+ │  Boundary. Render CV/letters in the user's own template. │
+ └────────────────────────┬────────────────────────────────┘
+                          ↓
+ ┌─ 6. VALIDATE ───────────────────────────────────────────┐
+ │  Fact-boundary check, quality check, completeness check. │
+ │  Regenerate on failure; escalate if it keeps failing.    │
+ └────────────────────────┬────────────────────────────────┘
+                          ↓
+ ┌─ 7. EXECUTE ────────────────────────────────────────────┐
+ │  Deterministic replay if we have an adapter, else agent. │
+ │  One action, verify it landed, rescan, repeat.           │
+ └────────────────────────┬────────────────────────────────┘
+                          ↓
+ ┌─ 8. APPROVE → SUBMIT → RECORD ──────────────────────────┐
+ │  Full preview. User approves. Submit. Capture evidence.  │
+ │  Track outcome. Heal the adapter from what we learned.   │
+ └─────────────────────────────────────────────────────────┘
 ```
 
-### 5.2 Core Components
+**Why this matters:** requirements 1–4 from the brief (job discovery, CV tailoring, hackathon
+submission, government forms) are not four features. They are four **adapters** over one
+pipeline. That is the whole architectural bet.
 
-#### Browser Automation Layer
-- **Foundation:** Browser Use (Python) or Playwright (Node.js)
-- **Responsibility:** Navigate, click, type, screenshot, upload
-- **Fallback:** Vision-based understanding when DOM insufficient
+---
 
-#### Personal Brain Service
-- **Responsibility:** Store + retrieve user data
-- **Storage:** SQLite (local) + optional cloud sync
-- **Operations:** Add project, update skills, retrieve for form filling
+## 6. The Personal Brain
 
-#### Task Orchestrator
-- **Responsibility:** Parse goal → create plan → execute with feedback
-- **Pattern:** OODA Loop (Observe → Orient → Decide → Act)
-- **Error Handling:** Reflection + self-correction
+The core asset. Everything else is an adapter over this.
 
-#### LLM Integration Layer
-- **Options:** Local (Llama, Ollama) or Cloud (Claude, GPT-4)
-- **Use Cases:** Goal understanding, answer generation, semantic matching
-- **Privacy:** Local for Personal Brain queries, cloud for complex analysis
+### 6.1 Design rules
 
-#### Communication Layer
-- **Chrome Extension:** Side panel + context menu
-- **WhatsApp/Telegram:** Bot commands + natural conversation
-- **Desktop:** Electron app with local browser
+- **Every fact carries provenance.** Where it came from (user-typed / parsed from CV / GitHub
+  import / answered during a form), when, and whether the user has confirmed it.
+- **Every fact carries confidence.** Parsed-from-PDF is not the same as user-confirmed.
+- **Facts are versioned.** Job titles change, skills grow. History is kept.
+- **Nothing is silently inferred.** If Haru guesses, the guess is marked and surfaced.
 
-### 5.3 Data Models
+### 6.2 Schema
 
-#### Project Model
-```python
-class Project:
-    id: str
-    title: str
-    description: str
-    technologies: List[str]  # ["React", "Node.js", "PostgreSQL"]
-    skills_demonstrated: List[str]  # ["fullstack", "system design"]
-    github_url: str
-    deployment_url: str
-    impact: str  # "Processed 1M+ messages daily"
-    duration: str  # "Jan 2023 - Dec 2023"
+```
+PersonalBrain
+│
+├── identity
+│   ├── legal_name, preferred_name, pronouns
+│   ├── email(s), phone(s)
+│   ├── address: street, city, region, country, postal_code
+│   ├── date_of_birth              [sensitive]
+│   ├── national_ids               [sensitive, encrypted, never to cloud]
+│   └── links: linkedin, github, portfolio, website, scholar, orcid
+│
+├── work_authorization             ← every job form asks; most tools omit
+│   ├── citizenship(s)
+│   ├── legally_authorized_in: [country codes]
+│   ├── requires_sponsorship: bool
+│   ├── permit_type, permit_expiry
+│   └── visa_status
+│
+├── availability
+│   ├── earliest_start_date
+│   ├── open_to: [full_time, part_time, contract, internship]
+│   ├── notice_period
+│   └── relocation_willing, remote_preference
+│
+├── compensation
+│   ├── expectation, range_min, range_max, currency
+│   └── current_salary              [sensitive, often illegal to ask — see §16.3]
+│
+├── education[]
+│   ├── institution, degree, field, grade
+│   ├── start_date, end_date (or expected)
+│   ├── thesis, honors, relevant_coursework[]
+│   └── transcript → document_ref
+│
+├── experience[]
+│   ├── org, title, location, employment_type
+│   ├── start_date, end_date
+│   ├── summary
+│   ├── achievements[]   { text, metric?, skills[], verified }
+│   └── skills[], technologies[]
+│
+├── projects[]
+│   ├── name, tagline, description
+│   ├── role, team_size, duration
+│   ├── technologies[], skills_demonstrated[]
+│   ├── repo_url, live_url, demo_video
+│   ├── outcomes[]       { text, metric?, verified }
+│   ├── source: manual | github_import | devpost_import
+│   └── media[]          → document_refs (screenshots, logos)
+│
+├── skills[]
+│   ├── name, category, proficiency
+│   ├── years_used, last_used
+│   └── evidence[]       → refs to projects/experience that back it
+│
+├── credentials[]
+│   ├── name, issuer, issue_date, expiry_date
+│   ├── credential_id, verify_url
+│   └── document_ref     ← certifications must be evidenced (P1)
+│
+├── writing_samples[]
+│   └── past prose the user wrote, used to learn their voice — see §10.3
+│
+├── question_bank[]      ← recurring application questions
+│   ├── canonical_question
+│   ├── variants[]       ("Why us?", "Why do you want to work here?")
+│   ├── base_answer
+│   ├── per_target_versions[]
+│   └── outcome_signal   (did submissions using this get responses?)
+│
+├── voluntary_disclosure [sensitive — see §16.3]
+│   ├── gender, race_ethnicity, veteran_status, disability_status
+│   └── default: "decline to self-identify" for all
+│
+├── standard_answers     ← the boring universal ones
+│   ├── age_18_or_over, background_check_consent
+│   ├── criminal_record, previously_employed_here
+│   └── how_did_you_hear
+│
+├── preferences
+│   ├── cv_templates[]           → see §11
+│   ├── tone: formal | warm | direct | academic
+│   ├── target_roles[], target_industries[], excluded_companies[]
+│   └── rate_limit: max submissions per day (default: low, deliberately)
+│
+└── fact_boundary        ← THE ANTI-FABRICATION CONTRACT (§10.2)
+    ├── allowed_skills[]         (derived from skills[] + evidence)
+    ├── preserved_orgs[]
+    ├── preserved_projects[]
+    ├── preserved_institutions[]
+    ├── real_metrics[]           (the ONLY numbers that may be cited)
+    └── never_claim[]            (explicit user-set prohibitions)
 ```
 
-#### Experience Model
-```python
-class Experience:
-    id: str
-    company: str
-    title: str
-    start_date: date
-    end_date: date
-    description: str
-    achievements: List[str]
-    technologies: List[str]
-    skills: List[str]
+### 6.3 Getting data in
+
+| Method | What it does | Confidence |
+| --- | --- | --- |
+| CV/résumé upload | Parse PDF/DOCX → populate everything it can | Medium — requires review |
+| GitHub import | Repos, languages, READMEs, commit activity → projects[] | Medium |
+| Devpost import | Past hackathon submissions → projects[] | Medium |
+| LinkedIn export | The official data-export ZIP, not scraping | Medium |
+| Guided interview | Conversational fill of gaps | High |
+| Learned from forms | Anything answered during §5 step 4 is written back | High |
+| Document extraction | ID, passport, transcripts → identity + education | Medium — always confirm |
+
+**Every import lands in a review queue.** Nothing enters the Brain as confirmed until the user
+confirms it. This is P1 in practice — the fact boundary is only as trustworthy as its inputs.
+
+---
+
+## 7. Document Vault
+
+Forms don't just ask questions; they demand files.
+
+```
+DocumentVault
+├── documents[]
+│   ├── type: cv | cover_letter | transcript | certificate | id | passport
+│   │       | photo | portfolio | reference_letter | tax_doc | proof_of_address
+│   ├── file (encrypted at rest)
+│   ├── issued_date, expiry_date
+│   ├── extracted_fields{}     → feeds the Brain, with provenance
+│   ├── sensitivity: normal | sensitive | never_upload_without_asking
+│   └── versions[]
+└── generated[]                 ← every CV/letter Haru produced, immutably kept
+    ├── source_target, template_used, content_selection
+    └── outcome_link            → §15
 ```
 
-#### Application Model
-```python
-class Application:
-    id: str
-    date_applied: datetime
-    company: str
-    job_title: str
-    job_url: str
-    status: Enum["Applied", "In Progress", "Interview", "Rejected", "Offer"]
-    cv_version: str  # hash of CV used
-    answers: Dict[str, str]  # question → answer
-    screenshots: List[str]  # paths to evidence
-    notes: str
-    outcome: str
+**Features that fall out of this:**
+- **Expiry warnings.** Passport expires in 60 days; certification lapsed last month.
+- **Upload matching.** A form asks for "proof of address" — Haru knows which file that is.
+- **Never-silently-upload.** Documents marked sensitive always require explicit per-use consent.
+
+---
+
+## 8. Target Adapters
+
+An adapter defines: how to recognize this target type, how to extract its Ask, what the Brain
+must supply, what gets generated, and how strict the gates are.
+
+### 8.1 Job Application
+- **Extract:** role, org, location, requirements, seniority, comp, deadline, ATS platform
+- **Generate:** tailored CV (§11), cover letter, per-question answers from the question bank
+- **Score:** fit 1–10 against the Brain; below threshold, tell the user honestly rather than applying
+- **Gate:** standard approval
+- **Known ATS:** Greenhouse, Lever, Workday, Ashby, SmartRecruiters, Taleo, BambooHR, Workable
+
+### 8.2 Hackathon Submission *(requirement 3)*
+
+The user supplies context and files; Haru writes and submits. Devpost first, then Devfolio,
+DoraHacks, and generic forms.
+
+- **Extract:** hackathon rules, theme, prize tracks, required fields, deadline, judging criteria
+- **Ingest:** the repo (README, code, commit history, languages), plus user notes and media
+- **Generate:** the standard Devpost story blocks — Inspiration / What it does / How we built it
+  / Challenges / Accomplishments / What we learned / What's next — plus tagline, built-with tags,
+  and prize-track alignment
+- **Gate:** standard approval
+
+**The distinguishing feature: submissions are grounded in the repository.**
+Haru reads the actual code before describing it. If the story claims Redis and there is no Redis
+in the project, that's a fact-boundary violation and it gets blocked. Hackathon write-ups are
+notoriously inflated; Haru's will be accurate, which is also better for judging — judges check.
+
+It also flags the reverse: real work in the repo that the draft failed to mention.
+
+### 8.3 Government & Institutional Forms *(requirement 4)*
+
+Highest stakes. False statements on official forms carry legal consequences, so this adapter
+runs in **high-stakes mode**.
+
+- **Extract:** form identity and version, required fields, required supporting documents,
+  eligibility rules, fees, deadline
+- **Match:** identity + documents, with **per-field confidence scores**
+- **Gate:** stricter — see below
+- **Output:** a complete audit record
+
+High-stakes mode differences:
+
+| | Standard | High-stakes |
+| --- | --- | --- |
+| Field confidence threshold | 0.8 auto-fill | 0.95, else ask |
+| Prose generation | Allowed | **Minimal** — facts only, no persuasive writing |
+| Approval | One gate before submit | Field-by-field review before submit |
+| Cloud models | Allowed for prose | **Blocked entirely** |
+| Evidence | Screenshot | Full record: every value, source, timestamp, hash |
+
+**Honest limitation:** Haru assists with government forms. It is not a lawyer or an immigration
+advisor and will say so, prominently, in this adapter.
+
+### 8.4 Generic Form
+The fallback. Any form Haru doesn't recognize: extract fields, match what it can, ask for the
+rest, standard gates. This is what makes the product open-ended rather than a fixed list of
+four things.
+
+---
+
+## 9. Opportunity Discovery *(requirement 1)*
+
+The brief asks for discovery beyond job boards — Facebook, LinkedIn, independent search.
+
+### 9.1 The design decision
+
+There is a tempting version of this where Haru logs into Facebook and LinkedIn and scrapes the
+user's feed. **We are not building that**, for two reasons: it is the exact behavior that got
+AIHawk detected and abandoned, and the downside lands on the user as a suspended account —
+their actual professional network.
+
+Instead: **the Opportunity Inbox.** The user is already in their feed. Capture is passive and
+happens in the session they're already sitting in.
+
+### 9.2 Sources
+
+| Source | Mechanism | Risk |
+| --- | --- | --- |
+| **Browser capture** | Extension button / right-click "Save to Haru" on anything you're looking at — a FB group post, a LinkedIn post, a Discord message, a tweet | None. You're browsing; Haru reads the page you're on. |
+| **Forward to Haru** | Share from phone via Telegram/WhatsApp, or forward to a personal ingest email | None |
+| **Open web search** | Haru searches the public web for matching opportunities | Low |
+| **Official APIs & feeds** | Job board APIs, RSS, newsletters, Devpost/Devfolio listings | None |
+| **Watched pages** | User nominates a careers page; Haru polls it politely | Low |
+| **Platform data exports** | LinkedIn's official export | None |
+
+This satisfies requirement 1 — a Facebook group post becomes an opportunity in two clicks — with
+none of the ban risk. It is also *better*, because it captures the long tail that no scraper
+reaches: Discord servers, private groups, newsletters, a friend's DM.
+
+### 9.3 What happens to a captured opportunity
+
+```
+Captured → Classified (job? hackathon? grant? form?)
+        → Enriched (fetch full description; three-tier: JSON-LD → selectors → model)
+        → Scored against the Brain
+        → Deduplicated (have we already applied to this?)
+        → Deadline extracted → calendar
+        → Queued for user review
 ```
 
----
-
-## 6. Implementation Phases
-
-### Phase 1: Killer Demo (2-3 weeks)
-**Goal:** End-to-end job application on a real job site
-
-**Deliverables:**
-- Chrome extension with side panel
-- Browser automation (click, type, fill, screenshot)
-- Goal parsing ("Apply to this job")
-- Simple form filling (hardcoded user data)
-- Approval gate before submit
-- Screenshot + confirmation
-
-**Success Metric:** Successfully fill and submit application on 1 realistic job site (LinkedIn, Indeed, or similar)
+Haru **never auto-submits from discovery.** Discovery fills a queue; the human decides.
 
 ---
 
-### Phase 2: Personal Intelligence (3-4 weeks)
-**Goal:** Personal Brain that powers smart filling + tailored CV
+## 10. Composition & the Fact Boundary
 
-**Deliverables:**
-- Personal Brain data model + storage
-- CV/Resume upload + parsing
-- Project + skill storage
-- Smart form filling (match fields to Personal Brain)
-- Smart project selection (semantic matching)
-- Dynamic CV generation (tailored to job)
+### 10.1 What gets generated
+CV content selection and bullet emphasis · cover letters · application question answers ·
+hackathon story sections · form free-text fields.
 
-**Success Metric:** Apply to 5 different jobs with different tailored CVs; reduced user input each time
+### 10.2 The Fact Boundary — the most important mechanism in the product
 
----
+Adapted from ApplyPilot's `scoring/validator.py`, extended. Every generated artifact passes
+validation before it can reach a form. Three independent checks:
 
-### Phase 3: Communication (2-3 weeks)
-**Goal:** Control agent from phone
+**Check 1 — Fact boundary (blocking, always).**
+The model may only reference skills in `allowed_skills`, organizations in `preserved_orgs`,
+projects in `preserved_projects`, institutions in `preserved_institutions`, and numbers in
+`real_metrics`. Adjacent technology may be mentioned as context but not claimed as experience.
 
-**Deliverables:**
-- WhatsApp/Telegram bot integration
-- Task initiation from chat ("Apply to [link]")
-- Question asking via chat
-- Approval flow via chat
-- Screenshot delivery via chat
+**Credentials are never stretchable.** A claimed certification must have a matching entry in
+`credentials[]` with a document. No exceptions, no modes.
 
-**Success Metric:** Full application workflow via WhatsApp/Telegram
+For hackathon submissions the boundary extends to the repository: claims about what the project
+does are checked against the actual code.
 
----
+**Check 2 — Cliché filter.**
+~50 phrases that mark text as machine-written: *passionate, dedicated, spearheaded, orchestrated,
+robust, cutting-edge, proven track record, team player, self-starter, detail-oriented, synergy,
+leveraged, thrives in, well-versed in.* Configurable severity.
 
-### Phase 4: Polish & Tracking (2-3 weeks)
-**Goal:** Production-ready with audit trail
+**Check 3 — Model leakage.**
+Catches the model talking to itself inside the deliverable: *"here is the revised…", "I apologize",
+"as requested", "Note:", "I have updated…"*. Always blocking — this is pure output corruption.
 
-**Deliverables:**
-- Application tracker (history, analytics)
-- Task memory (learned workflows)
-- Error recovery + self-healing
-- Activity timeline (explain what agent did)
-- Privacy controls
+**On failure:** regenerate with the violation fed back, up to N attempts, then stop and show the
+user what it couldn't produce honestly. **Haru never degrades to submitting unvalidated content.**
 
-**Success Metric:** User can see complete history, review past applications, understand agent's reasoning
+### 10.3 Voice
 
----
-
-## 7. Technical Stack Recommendation
-
-### Backend
-- **Language:** Python or Node.js
-- **Framework:** FastAPI (Python) or Express (Node.js)
-- **Database:** SQLite (local) + PostgreSQL (optional cloud)
-
-### Browser Automation
-- **Primary:** Browser Use (Python) or Playwright (Node.js)
-- **Execution:** Headless Chrome/Firefox
-- **Vision:** Claude Vision API or local model (LLaVA)
-
-### AI/LLM
-- **Local Option:** Ollama + Llama 2 (privacy-first)
-- **Cloud Option:** Claude API or GPT-4 (more capable)
-- **Hybrid:** Use local for Personal Brain, cloud for complex tasks
-
-### UI/Frontend
-- **Chrome Extension:** React + Manifest V3
-- **Desktop:** Electron + React or Tauri + Vue
-- **Web:** React or Vue
-- **Bot:** Python-telegram-bot or similar
-
-### Storage
-- **Local:** SQLite + file system
-- **Cloud (optional):** S3 for screenshots, PostgreSQL for application logs
+Generated prose should sound like the user, not like an LLM. Haru learns from `writing_samples[]`
+— their real cover letters, README prose, past submissions — and matches register. The cliché
+filter enforces the floor; voice-matching raises the ceiling.
 
 ---
 
-## 8. Security & Privacy Considerations
+## 11. CV Generation *(requirement 2)*
 
-### Data Security
-- Personal Brain encrypted at rest (user's local device)
-- Screenshots/documents stored securely
-- No credential storage (use browser's password manager)
-- Audit log of all actions
+The requirement: **keep my design, change what's in it.**
 
-### Privacy Guarantees
-- Option to run completely locally (no cloud)
-- Optional telemetry (opt-in only)
-- No tracking of browsing history
-- User owns all generated content (CVs, answers)
+### 11.1 The separation
 
-### Sensitive Action Safety
-- Manual approval required before Submit/Send/Pay
-- Screenshot review before submission
-- Timeout on approval requests (auto-cancel after 1 hour)
-- Rollback capability for recent submissions
+The single most important design decision here is that **presentation and content never mix.**
 
----
+```
+CVTemplate  (owned by user, stable)          Content (from the Brain, per target)
+├── layout, fonts, spacing, colors           ├── which experiences
+├── section order                            ├── which projects
+├── heading labels                     ×     ├── which skills
+├── slot definitions                         ├── bullet selection + emphasis
+└── page rules                               └── summary text
+                    ↓
+              Rendered PDF
+```
 
-## 8b. Constraints This PRD Originally Ignored
+Tailoring changes only the right column. The design is never regenerated, so output is
+**pixel-stable across every application.**
 
-Three constraints surfaced from reading AIHawk and ApplyPilot. Each can sink the product and
-none were in the first draft.
+### 11.2 What tailoring may change
 
-### 8b.1 Bot detection is a first-class engineering problem
-
-AIHawk's author abandoned standard Playwright and built
-[invisible_playwright](https://github.com/feder-cr/invisible_playwright) — a Firefox patched at
-the engine level — specifically because **AIHawk kept getting detected at scale**. Their
-documented findings: an attached debugger is itself detectable, CDP-driven automation leaves
-fingerprints, and automating a login form is far riskier than reusing an existing session.
-
-Implications:
-- Assume LinkedIn/Indeed/Workday actively detect automation. Plan for it in Phase 1, not later.
-- **Prefer reusing the user's existing logged-in browser session over automating login.** This
-  also removes any need to store the user's password. (Note: ApplyPilot's profile schema has a
-  `personal.password` field — we should **not** copy that.)
-- Human-paced interaction is both safer and more honest than maximum throughput.
-- Detection risk is a reason to favor the user's own browser (Desktop Agent / extension) over
-  a datacenter browser.
-
-### 8b.2 Terms of service and account risk
-
-Automated application submission plausibly violates the ToS of LinkedIn, Indeed, and most job
-boards. The realistic worst case for a user is **account suspension**, and that is their
-primary professional network. This must be disclosed in-product before first run, not buried.
-
-Open question for the team: do we restrict to boards where automation is tolerated, require
-the user to acknowledge the risk per-platform, or keep a human in the loop for every submit
-(which is our stated design anyway and materially reduces exposure)?
-
-### 8b.3 Volume is a reputational liability
-
-AIHawk drew sustained negative coverage — TechCrunch, Wired, The Verge, 404 Media
-("AI is enabling job seekers to think like spammers"; a reporter auto-applied to 2,843 roles).
-ApplyPilot leads with "1,000 jobs in 2 days."
-
-That framing invites the same backlash, and it also degrades the thing users actually want:
-getting hired. **Haru should explicitly not compete on volume.** Position on quality per
-application, human review, and honest representation. Consider a deliberate rate limit as a
-product feature rather than a limitation.
-
----
-
-## 9. Success Metrics
-
-> All numbers below are **aspirational targets set before any build or measurement**. They are
-> not forecasts and are not backed by data. Revisit them after Phase 1 produces real numbers.
-
-### Quantitative targets
-- **Adoption:** 100+ active users in first month
-- **Completion Rate:** 80%+ of initiated applications are successfully completed
-- **Time Saved:** Average 10 minutes saved per application
-- **Accuracy:** 95%+ form fill accuracy (auto-filled vs. manually entered)
-
-### Qualitative
-- User testimonials showing application confidence
-- Successful interviews from agent-submitted applications
-- User preference for agent over manual application
-
-### Technical
-- 99% uptime (for deployed version)
-- <2s average task completion time
-- Zero data breaches
-- <1% error rate in form filling
-
----
-
-## 10. Open Questions & Future Considerations
-
-1. **Local LLM vs Cloud:** What's the right tradeoff for MVP? Start with cloud (more capable), offer local option later?
-
-2. **Website Coverage:** Should we build site-specific adapters for popular job boards, or keep it universal?
-
-3. **Payment Model:** Freemium (limited applications/month) or subscription?
-
-4. **Scope:** Start with job applications, expand to general form filling?
-
-5. **Integrations:** Should Personal Brain auto-sync with LinkedIn, GitHub, Notion?
-
----
-
-## 11. Success Stories & Differentiation
-
-### Why Haru Wins
-1. **Personal:** Knows who you are, adapts to your style
-2. **Intelligent:** Understands opportunities, matches semantically
-3. **Trustworthy:** Asks before critical actions, shows proof
-4. **Private:** Runs locally, keeps data on your device
-5. **Delightful:** WhatsApp/Telegram control, asynchronous interaction
-
-### Honest competitive position
-- **vs. Browser Use:** Not just automation, adds intelligence layer
-- **vs. Resume Tailor:** Not just CV, does end-to-end applications
-- **vs. LinkedIn Easy Apply:** Works on any website, truly tailored
-- **vs. Manual applications:** faster, less application fatigue
-- **vs. AIHawk:** AIHawk is LinkedIn-only with template resumes. We are broader and per-job tailored.
-- **vs. ApplyPilot:** ⚠️ **This is the real competitor and we do not currently beat it.** See below.
-
-### ⚠️ Competitive reality check — ApplyPilot
-
-Section 2 of this PRD originally claimed nobody combines "knows you + knows task + knows web."
-That claim is **false as written**. [ApplyPilot](https://github.com/Pickle-Pixel/ApplyPilot)
-already ships a 6-stage pipeline that discovers jobs across 5 boards plus 48 Workday portals,
-scores fit 1–10 against your profile, tailors a resume per job with fabrication validation,
-writes cover letters, and autonomously submits via Playwright MCP. It is Python, AGPL-3.0, and
-production-grade today.
-
-Where we still have honest room:
-
-| Gap in ApplyPilot | Our opportunity |
+| Changeable | Fixed |
 | --- | --- |
-| CLI-only, no interactive UI | Chrome side panel + real-time approval UX |
-| Runs as a batch job | Conversational, one-job-at-a-time, human-in-the-loop |
-| No phone control | WhatsApp/Telegram ask-and-approve while away from desk |
-| Optimizes for volume (1,000 applications) | Optimize for **quality per application** |
-| Profile is a static JSON file | Living Personal Brain: GitHub import, CV parsing, learns over time |
-| Job applications only | General web tasks (government forms, downloads, signups) |
+| Which projects appear, and their order | Fonts, colors, margins, spacing |
+| Which experiences appear | Overall layout and grid |
+| Section order (skills-first vs experience-first) | Page size and rules |
+| **Heading labels** (*"Projects"* → *"Selected Work"*) | The template itself |
+| Bullet selection and emphasis within the fact boundary | |
+| Summary/objective paragraph | |
+| Skills shown and their grouping | |
 
-**Strategic implication:** our differentiator is **interaction model and breadth**, not the
-core pipeline. If we cannot beat ApplyPilot on UX and human-in-the-loop quality, we should
-seriously consider contributing to it instead of rebuilding it. AGPL-3.0 means we cannot
-copy its code into a closed product — but we can read it, and we should.
+This matches the brief exactly: *"cv style same, just projects in and out and heading or
+whatever will be changed."*
+
+### 11.3 Getting the user's template in
+
+**Honest constraint:** perfectly reproducing an arbitrary PDF design is not reliably achievable.
+Anyone promising that is overselling. Three paths instead:
+
+1. **Auto-extract (best effort).** Parse the user's CV, reconstruct a close-matching HTML/CSS
+   template, show it side-by-side with the original, let them adjust. Good for most CVs.
+2. **Bring your own template.** Upload HTML/CSS, LaTeX, or DOCX with named slots. Exact by
+   construction. Best for people with an existing LaTeX CV.
+3. **Start from a starter.** A small set of well-typeset templates.
+
+Rendering: HTML/CSS → PDF via headless Chrome (deterministic, easy to tweak), with LaTeX
+supported for users who already live there.
+
+### 11.4 Review
+
+Before any CV is used: side-by-side diff against the master, with every change highlighted and
+attributed — *"Added 'Optimized query performance' bullet — matches JD requirement 'database
+performance'."* Borrowed from ResumeTelling's highlighted-diff idea. The user can veto any
+individual change.
+
+Multiple named templates supported (academic CV, industry résumé, one-pager).
 
 ---
 
-## Appendix: Inspiration from Related Projects
+## 12. Execution Layer
 
-### Architecture Patterns Borrowed
-- **Browser Use:** Core automation architecture
-- **REAL Agent:** Orchestrator + Planner + Validator pattern
-- **Cognito:** Conversation Agent ↔ Browser Action Agent separation
-- **AutoApply.AI:** Workflow (find → analyze → prepare → approve → submit → confirm)
-- **ResumeTelling:** Personal Career Brain data structure
-- **Resume ArchiTech:** Semantic project matching
+### 12.1 Deterministic first
 
-### This PRD combines the best of all into one cohesive product that solves a real, painful problem.
+```
+Target site
+     ↓
+Do we have a recorded adapter?
+     ├── YES → replay it deterministically      ← free, fast, reproducible
+     │           ↓ step fails?
+     │         fall back to agent for that step
+     │           ↓ recovered?
+     │         HEAL the adapter → next run is deterministic again
+     └── NO  → agent drives, and we RECORD it into a new adapter
+```
+
+Verified from workflow-use, which has a dedicated `healing/` module and selector-generation with
+tested fallback alternatives. The consequence: the tenth Greenhouse application costs almost no
+tokens, and every failure permanently improves the system. **This is the compounding moat from §2.**
+
+### 12.2 The agent loop
+
+Taken from NaviNate's `runTurn`, which arrived at this the hard way:
+
+```
+scan page → ask model → take EXACTLY ONE action → verify it landed → rescan → repeat
+```
+
+**One action per turn, always** — even if the model returns several, only the first fires.
+Blind multi-step plans go stale the instant the page changes. NaviNate's own comment on this
+is *"the real fix for the 'did it 4 times' bug."*
+
+### 12.3 Post-action verification (P4)
+
+NaviNate's admitted top gap; we treat it as required. After every action, confirm the observable
+result before reporting success:
+
+| Action | Verification |
+| --- | --- |
+| Fill field | Read the value back; confirm it matches, and that the app's state updated |
+| Select dropdown | Confirm selected option |
+| Click | Confirm expected state change (nav, modal, class, DOM diff) |
+| Upload | Confirm filename appears in the UI |
+| Submit | Confirm confirmation page / success indicator / URL change |
+
+Unverified action = failed action. Retry, then escalate. **Haru never reports success it hasn't
+observed.**
+
+### 12.4 Framework-controlled inputs
+
+Concrete gotcha that would otherwise cost days. Setting `element.value = x` on a React-controlled
+input does **not** fire React's synthetic `onChange`. The DOM shows the text, React's state stays
+empty, and the form submits blank while looking filled.
+
+The fix, verified in NaviNate's widget:
+
+```js
+const setter = Object.getOwnPropertyDescriptor(
+  window.HTMLInputElement.prototype, "value"
+).set;
+setter.call(element, value);
+element.dispatchEvent(new Event("input",  { bubbles: true }));
+element.dispatchEvent(new Event("change", { bubbles: true }));
+```
+
+Greenhouse, Lever, and Ashby are all React. This is not an edge case.
+
+### 12.5 Action registry
+
+Following Cognito's pattern: the model selects from a **registry of typed, validated actions**,
+not free-form code. Each action declares its parameters, preconditions, verification method, and
+whether it is reversible.
+
+`navigate · click · fill · select · check · scroll · upload · download · screenshot · extract · wait · highlight`
+
+### 12.6 Robustness
+
+- **Loop guard** — action signatures keyed on stable element IDs; repeat detection nudges the
+  model forward before giving up (NaviNate's approach)
+- **Step cap** per goal
+- **State survives navigation** — goal, history, undo stack, and progress persist across page
+  loads and are rebuilt on the destination page
+- **Undo** — per-action reversal where the action is reversible; clearly marked where it isn't
+- **Kill switch** — always-visible stop control; the agent halts immediately
+- **DOM → vision fallback** for pages the DOM can't explain
+
+### 12.7 Where the browser runs
+
+**In the user's own browser, in their existing authenticated session.** Consequences: no password
+storage, no login automation, no separate credential surface, and behavior that is simply what it
+appears to be — a user's browser doing what the user asked, at human pace.
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** 2026-08-10  
-**Status:** Ready for Engineering Review
+## 13. Model Router *(requirement 5)*
+
+Free by default (P6), better if you pay, and never at the cost of privacy.
+
+### 13.1 Tiers
+
+| Tier | Runs | Used for |
+| --- | --- | --- |
+| **T0** Deterministic | No model | Recorded adapters, known selectors, regex, cached answers |
+| **T1** Local small | 3–8B | Field matching, classification, extraction, form parsing |
+| **T2** Local large | 14B+ | Prose drafts, reasoning, scoring |
+| **T3** Cloud frontier | Opt-in API | Final prose polish, hard vision, complex reasoning |
+| **E** Embeddings | Always local | Semantic matching, dedup, question bank |
+
+Setup probes the machine (RAM/VRAM) and picks a working local configuration rather than asking
+the user to guess.
+
+### 13.2 Privacy rules — hard constraints
+
+1. **Raw Personal Brain PII never goes to a cloud model.** Not identity, not national IDs, not
+   voluntary disclosures, not documents.
+2. Cloud calls receive the **target's text** (job description, form text) plus a **redacted,
+   user-approved fact summary** — never the raw record.
+3. **High-stakes mode blocks T3 entirely** (§8.3).
+4. Every cloud call is logged with what was sent, inspectable by the user.
+
+### 13.3 Cost
+
+Per-task token and cost meter (Cognito tracks usage per thread; we do the same), a monthly
+budget with a hard stop, and an always-available "this task cost $0.00 — run locally" default.
+
+### 13.4 Honesty about local models
+
+Local models are meaningfully worse at persuasive prose than frontier models. Haru will not
+pretend otherwise. Local is the default and is genuinely good at extraction, matching, and
+classification — the bulk of the work. For final prose, Haru offers a per-task upgrade and shows
+the estimated cost. The user chooses, informed.
+
+---
+
+## 14. Safety, Approval, Evidence
+
+### 14.1 Action classes
+
+| Class | Examples | Gate |
+| --- | --- | --- |
+| **Free** | Navigate, read, scroll, screenshot, extract | None |
+| **Reversible** | Fill, select, upload | None; undoable |
+| **Committing** | Submit, send, pay, delete, accept terms | **Explicit approval, always** |
+| **Sensitive** | Upload ID/passport, enter national ID, financial data | Explicit per-use consent |
+
+No configuration option removes the committing-action gate. That is what P3 means.
+
+### 14.2 The approval surface
+
+Not a yes/no dialog. A full preview:
+- Every field and the exact value that will be submitted
+- Every document that will be uploaded
+- Every generated document, rendered
+- Diff of the tailored CV against master
+- Fit score and honest reasoning
+- Anything Haru is unsure about, flagged
+- Actions: **Approve · Edit · Reject · Save for later**
+
+Approval requests expire (default 24h) rather than sitting live indefinitely.
+
+### 14.3 Evidence
+
+Every submission produces an immutable record: timestamp, target URL, every field value and its
+source, documents uploaded with hashes, generated artifacts, screenshots of the filled form and
+the confirmation, full action log, and models used. Exportable.
+
+This matters most for government forms, where "what exactly did I submit and when" is a question
+with real consequences.
+
+---
+
+## 15. Tracker & the Outcome Loop
+
+```
+Submission
+├── target, type, org, date, deadline
+├── status: draft | submitted | acknowledged | in_review
+│         | interview | accepted | rejected | withdrawn | expired
+├── artifacts: CV version, letter, answers used
+├── evidence: screenshots, action log
+├── follow_ups[], reminders[]
+└── outcome + notes
+```
+
+**The loop nobody closes:** correlate outcomes back to artifacts. Which CV template gets more
+responses. Which question-bank answers precede interviews. Which fit-score band actually converts.
+
+**Honesty requirement:** with small sample sizes this is noise, and Haru will say so rather than
+presenting a confident-looking chart over 11 applications. Signals surface only past a threshold,
+and always with the sample size attached.
+
+Also here: deadline calendar, duplicate detection, follow-up reminders, and status-change capture.
+
+---
+
+## 16. Interfaces
+
+### 16.1 Surfaces
+
+| Surface | Role |
+| --- | --- |
+| **Browser extension** | Capture opportunities, side panel, watch the agent work, approve inline |
+| **Desktop app** | The engine. Local models, Brain storage, document vault, browser control |
+| **Chat (Telegram / WhatsApp)** | Forward opportunities, answer questions, approve, get confirmations while away |
+| **Web dashboard (local)** | Brain management, templates, tracker, evidence, settings |
+
+The desktop app is the product; the others are windows onto it. Everything runs locally with no
+account required.
+
+### 16.2 Terms of service — telling the truth
+
+Some sites' terms prohibit automated interaction. Haru's position:
+
+- It states plainly, per platform, what the terms say and what the realistic risk is —
+  for a job site, that's account suspension on the user's main professional network
+- It defaults to **human-approved, one-at-a-time, human-paced** submission, which is the lowest-risk
+  posture and also the design we want for quality reasons
+- It does not build evasion machinery, and it does not pretend the risk is zero
+- The user decides with full information
+
+### 16.3 Sensitive fields
+
+`voluntary_disclosure` (gender, race, veteran, disability) defaults to *decline to self-identify*
+for every field, requires explicit opt-in to set otherwise, and never leaves the device.
+
+`current_salary` is included because forms ask, but Haru flags that this question is prohibited in
+many jurisdictions and defaults to leaving it blank.
+
+---
+
+## 17. Build Milestones
+
+No dates — sequenced by dependency. Each milestone ends in something demonstrably working.
+
+| # | Milestone | Done when |
+| --- | --- | --- |
+| **M0** | **Brain core** — schema, local encrypted storage, CV import, review queue, provenance | You can import a CV and get a reviewable, confirmed record |
+| **M1** | **Fact boundary** — validator with all three checks, plus tests with deliberate fabrication attempts | Generated text containing an unowned skill is reliably blocked |
+| **M2** | **CV engine** — template/content split, import paths, tailoring, diff review, PDF render | Two jobs produce two different CVs, identical design |
+| **M3** | **Execution core** — action registry, one-action loop, post-action verification, native setter, loop guard, kill switch, session persistence | A React-based ATS form is filled and every field verified |
+| **M4** | **First adapter: job applications** — extraction, matching, generation, approval, evidence | End-to-end application on Greenhouse and Lever, human-approved |
+| **M5** | **Local model router** — probe, tiers, T0–T2, cost meter, privacy enforcement | Full application completes with no API key and $0 cost |
+| **M6** | **Adapter: hackathon submissions** — repo ingestion, story generation, repo-grounded validation, Devpost | A real submission drafted from a real repo, with inflated claims caught |
+| **M7** | **Opportunity Inbox** — capture button, forwarding, classification, enrichment, scoring, dedup, deadlines | An opportunity captured from a Facebook group post reaches the queue |
+| **M8** | **Adapter: government forms** — document extraction, confidence scoring, high-stakes mode, audit record | One real form completed field-by-field with full evidence |
+| **M9** | **Deterministic adapters** — recording, replay, healing, adapter library | The tenth Greenhouse application uses zero tokens |
+| **M10** | **Tracker & outcomes** — status, follow-ups, correlation with honest sample-size reporting | Outcomes visible; weak signals labeled weak |
+| **M11** | **Chat surface** — forwarding, Q&A, remote approval | A submission approved from a phone, away from the desk |
+| **M12** | **Generic form adapter** — the open-ended fallback | An unseen form type completes with human help |
+
+**M1 before M2 is deliberate.** The validator must exist before anything generates text that
+could reach a form.
+
+---
+
+## 18. Risks
+
+| Risk | Severity | Response |
+| --- | --- | --- |
+| Fabrication reaches a real submission | **Critical** | Fact boundary (§10.2), blocking, never bypassable. Adversarial tests in M1. |
+| Government form filled wrong | **Critical** | High-stakes mode, field-level review, no cloud, full audit (§8.3) |
+| Site terms → user account suspended | **High** | Disclose per platform, human-paced default, user decides (§16.2) |
+| ApplyPilot is simply better at jobs | **High** | Don't compete there. Cross-domain identity is the product (§2). |
+| Local models too weak for good prose | **Medium** | Honest tiering; local excels at extraction/matching; opt-in upgrade for prose (§13.4) |
+| CV design can't be reproduced faithfully | **Medium** | Three import paths; don't promise pixel-perfect PDF reproduction (§11.3) |
+| Sites change and adapters break | **Medium** | Healing (§12.1) + agent fallback + vision |
+| Brain becomes stale | **Medium** | Periodic review prompts; last-confirmed dates on facts |
+| Scope sprawl across four adapters | **Medium** | One pipeline, thin adapters (§5). If an adapter needs pipeline changes, that's the signal to stop. |
+
+---
+
+## 19. Explicitly not building
+
+Stated so they don't creep back in:
+
+- **Mass-volume application mode.** No "apply to 500 jobs." Rate limits are a feature.
+- **Credential storage or login automation.** Session reuse only.
+- **Detection-evasion machinery.** Not an arms race we should be in.
+- **Fabrication, in any mode.** No "creative" setting that relaxes the fact boundary.
+- **Cloud-by-default anything.** No account required to use the product.
+- **Silent submission.** No configuration removes the committing-action gate.
+- **Scraping logged-in social feeds.** Capture, don't scrape (§9.1).
+- **Copying Cognito's code.** BUSL-1.1. Read for ideas only.
+- **Legal or immigration advice.** Assist with forms; say plainly what we are not.
+
+---
+
+## 20. Open questions
+
+1. **Language/runtime.** Python has the AI ecosystem; TypeScript unifies with the extension.
+   Leaning Python core + TS extension, but this is unresolved.
+2. **License.** ApplyPilot is AGPL-3.0 — we cannot copy from it. Do we open-source Haru, and
+   under what?
+3. **Is there a "contribute upstream instead" version?** Worth genuinely considering for the job
+   adapter specifically, even while building the identity layer independently.
+4. **Multi-profile** — academic vs industry personas as separate Brains, or views over one?
+5. **Sharing adapters.** A community library of site adapters is valuable and compounding, but
+   raises trust and review questions.
+6. **Which government forms first**, and in which country? This determines a lot of M8.
+
+---
+
+## Appendix — sources
+
+Verified by cloning and reading source (2026-08-10):
+
+- **ApplyPilot** — `scoring/validator.py` (fact boundary, cliché list, leak phrases),
+  `profile.example.json` (schema completeness), `pipeline.py` (staged dependencies)
+- **AIHawk** — `src/resume_schemas/` (Pydantic modeling); its detection history and the author's
+  move to `invisible_playwright` informed §12.7 and §16.2
+- **workflow-use** — `workflow_use/healing/`, controller selector generation (§12.1)
+- **NaviNate** — `widget/widget.js` `runTurn` one-action loop, native value setter, loop guard,
+  sessionStorage persistence; its missing post-action verification became P4
+- **Browser Use** — service pattern, event bus, watchdogs, CDP recovery
+- **Cognito** — action registry, per-thread usage tracking, conversation/action separation.
+  **BUSL-1.1: read only.**
+
+From descriptions only (no accessible source): Resume ArchiTech, ResumeTelling, Resume Tailor,
+FormPilot, Axis, AutoApply.AI. Two GitHub URLs in the original research notes were 404s.

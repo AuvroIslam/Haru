@@ -1,706 +1,266 @@
-# Haru Implementation Roadmap
-## Detailed Technical Plan & Phase Breakdown
+# Haru — Technical Build Plan
+
+**Companion to:** [PRD.md](PRD.md) (Draft 2.0)
+**Status:** Draft 2.0 — rewritten for the identity-layer product
+**Last updated:** 2026-08-10
+
+> Nothing here has been built or measured. Every number is a target or an estimate, and every
+> version is unpinned until checked against a registry.
 
 ---
 
-## 1. Technical Stack Decision Matrix
+## 1. Architecture decisions
 
-Based on Browser Use analysis and project requirements, here are the recommended decisions:
+### 1.1 Language split — **decided: Python core, TypeScript surfaces**
 
-### 1.1 Core Browser Automation
+| Layer | Language | Why |
+| --- | --- | --- |
+| Core engine, Brain, validators, adapters | Python | Document parsing, local model runtimes, embeddings, and PDF tooling are all strongest here |
+| Browser extension | TypeScript | No choice |
+| Desktop shell | TypeScript (Tauri or Electron) | Wraps the Python engine |
+| Local dashboard | TypeScript | Shares components with the extension |
 
-**Decision: Python + Browser Use + Playwright Hybrid**
+The engine is a **local HTTP + WebSocket service**. Every surface talks to it the same way. This
+keeps the extension, desktop app, and chat bot from each reimplementing logic.
+
+### 1.2 Storage — **decided: SQLite + encrypted file vault**
+
+- SQLite for the Brain, tracker, adapters, question bank. Single file, portable, greppable.
+- Documents encrypted at rest in a vault directory, keyed from an OS-keychain-held key.
+- Embeddings in the same SQLite file via `sqlite-vec` (avoid a second datastore until proven necessary).
+- **Export to plain JSON + files must work from M0.** P2 in the PRD means no lock-in, and that's
+  easy to build in and painful to retrofit.
+
+### 1.3 Browser control — **decided: user's own browser via CDP**
+
+Attach to the user's real Chrome profile rather than launching a clean automation browser.
+Follows PRD P7 and §12.7: existing session, no stored passwords, no login automation.
+
+- **Playwright** for control (mature, typed, good CDP access)
+- **Browser Use** consulted for its watchdog/recovery patterns; adopt the pattern, depend on the
+  library only where it earns its place
+- Extension provides in-page capabilities CDP can't reach cleanly (capture button, side panel, overlay)
+
+### 1.4 Execution model
 
 ```
-Layer                    Technology          Why
-─────────────────────────────────────────────────────────
-Browser Control          Playwright          - Direct CDP access
-                         (Python)            - Reliable automation
-                                             - Type-safe actions
-
-High-Level Agent         Browser Use         - Battle-tested
-                         (Python)            - Vision + DOM fallback
-                                             - Recovery mechanisms
-                                             - Orchestrator pattern
-
-Orchestration            Custom Python       - REAL Agent pattern
-                         (Orchestrator)      - Separation of concerns
+Goal
+ └→ Adapter available? ──yes→ Deterministic replay (T0, zero tokens)
+                        │         └ step fails → agent for that step → heal adapter
+                        └──no──→ Agent loop, recording as it goes → new adapter
 ```
 
-**Why this stack:**
-- Browser Use provides proven automation + recovery patterns
-- Playwright gives low-level control when needed
-- Python ecosystem for AI/NLP is more mature (spaCy, transformers)
-- Easier local LLM integration (ollama, LlamaCpp)
+Agent loop is strictly: **scan → one action → verify → rescan → repeat.** No multi-step plans.
 
-**Execution model: deterministic first, agent only on failure.**
-Verified from [workflow-use](https://github.com/browser-use/workflow-use), which has a dedicated
-`healing/` module and selector-generator/xpath-optimization logic in its controller. Do **not**
-let an LLM improvise every step on every run — it is slow, expensive, and non-reproducible.
+### 1.5 Model runtime — **decided: Ollama for local, provider-agnostic interface**
 
-```
-Known site (e.g. Greenhouse, Workday, Lever)
-        ↓
-Replay recorded deterministic workflow   ← fast, free, reproducible
-        ↓
-   step fails?
-        ↓ yes
-Fall back to LLM browser agent for that step
-        ↓
-Succeeded? → heal the stored workflow so next run is deterministic again
-```
-
-Two consequences: the 10th Workday application costs near-zero LLM tokens, and each failure
-makes the system permanently better. This should be designed into Phase 1's action layer even
-though healing itself lands in Phase 4.
-
-**Session strategy (security-critical):** attach to the user's existing logged-in browser
-profile. Do not automate login and do not store passwords — see PRD §8b.1.
+Ollama for T1/T2 (easy install, good model coverage), behind an interface thin enough to swap for
+llama.cpp later. Cloud providers behind the same interface, opt-in only. Embeddings always local.
 
 ---
 
-### 1.2 Backend Architecture
-
-```
-Backend Service (FastAPI)
-├── REST API Endpoints
-│   ├── /task/create (start new task)
-│   ├── /task/{id}/status (poll status)
-│   ├── /task/{id}/approve (human approval)
-│   └── /task/{id}/screenshot (get evidence)
-├── WebSocket Server
-│   ├── Real-time progress updates
-│   ├── Human-in-the-loop questions
-│   └── Approval gates
-└── Background Workers (Celery)
-    ├── Task Orchestrator
-    ├── Form Analyzer
-    ├── CV Generator
-    └── Answer Generator
-```
-
-**Tech Stack:**
-- **Framework:** FastAPI (async, type-hints, auto-docs)
-- **Job Queue:** Celery + Redis (task distribution)
-- **DB:** SQLite (local) + PostgreSQL (optional cloud)
-- **Cache:** Redis (session state, embeddings cache)
-
----
-
-### 1.3 Personal Brain Architecture
-
-```
-Personal Brain Service
-├── Data Layer (SQLite)
-│   ├── Projects table
-│   ├── Experience table
-│   ├── Skills table
-│   └── Documents table
-├── Processing Layer
-│   ├── Document parser (PDFs, images)
-│   ├── Information extractor (LLM-based)
-│   └── Embedding generator (semantic search)
-└── Query Layer
-    ├── Form field matcher
-    ├── Project selector
-    └── Skill ranker
-```
-
-**Key Feature: Semantic Search**
-```python
-# When matching form field "Tell us about your backend experience"
-# to user's Personal Brain:
-
-user_experiences = [
-    {"role": "Backend Engineer", "skills": ["Python", "PostgreSQL", "microservices"]},
-    {"role": "DevOps", "skills": ["Kubernetes", "CI/CD", "infrastructure"]},
-]
-
-# Embed the form field question
-field_embedding = embed("Tell us about your backend experience")
-
-# Find most relevant experience
-best_match = find_most_relevant(user_experiences, field_embedding)
-# → Backend Engineer experience (highest semantic similarity)
-```
-
----
-
-### 1.4 LLM Strategy
-
-**Decision: Hybrid Local + Cloud**
-
-```
-Use Case                    Provider            Reason
-──────────────────────────────────────────────────────
-Goal parsing               Local (Ollama)       Fast, always available
-Form field analysis        Local or Cloud       Trade speed vs accuracy
-CV generation              Local (Llama 2)      Privacy-critical
-Answer generation          Cloud (Claude)       Complex reasoning needed
-Project matching           Local (embeddings)   Speed + privacy
-Job requirement parsing    Cloud (Claude)       Accuracy matters
-```
-
-**Implementation Pattern:**
-```python
-class LLMRouter:
-    async def generate_cv(self, user_data, job_desc):
-        # Privacy-critical: run local
-        return await local_llm.generate(...)
-    
-    async def generate_answer(self, question, user_context):
-        # Complex: use cloud for quality
-        return await claude.generate(...)
-    
-    async def parse_form(self, form_html):
-        # Speed matters: use local
-        return await local_llm.parse(...)
-```
-
----
-
-## 2. Phase 1: Killer Demo (2-3 weeks)
-
-### Goal
-End-to-end job application on a real job board (LinkedIn Easy Apply or Indeed)
-
-### Deliverables
-
-#### 2.1 Chrome Extension Skeleton
-**Files:**
-- `manifest.json` - Extension configuration
-- `side-panel/panel.html` - Main UI
-- `side-panel/panel.js` - Panel controller
-- `content-script.js` - Page interaction
-- `background-service-worker.js` - Event handling
-
-**Features:**
-- Side panel UI with task input
-- "Apply to this job" button (context menu)
-- Progress indicator
-- Screenshot viewer
-- Approval modal
-
-**Code Sketch:**
-```javascript
-// background-service-worker.js
-chrome.runtime.onMessage.addListener(async (request, sender) => {
-    if (request.action === "startTask") {
-        const task = await backend.createTask({
-            goal: request.goal,
-            url: sender.url
-        });
-        // Poll for updates
-        broadcastProgress(task);
-    }
-});
-
-// side-panel/panel.js
-document.getElementById("applyBtn").addEventListener("click", () => {
-    const goal = "Apply to this job";
-    chrome.runtime.sendMessage({ action: "startTask", goal });
-});
-```
-
-#### 2.2 FastAPI Backend
-
-**Endpoints:**
-```python
-# app/main.py
-from fastapi import FastAPI, WebSocket
-
-app = FastAPI()
-
-@app.post("/task/create")
-async def create_task(task_req: TaskRequest) -> TaskResponse:
-    """Start new task"""
-    task = Task.create(goal=task_req.goal, url=task_req.url)
-    celery_app.send_task("orchestrator.run", args=[task.id])
-    return TaskResponse(id=task.id, status="queued")
-
-@app.get("/task/{task_id}/status")
-async def get_task_status(task_id: str) -> TaskStatusResponse:
-    """Poll task progress"""
-    task = Task.get(task_id)
-    return TaskStatusResponse(
-        status=task.status,
-        current_step=task.current_step,
-        screenshot=task.latest_screenshot
-    )
-
-@app.post("/task/{task_id}/approve")
-async def approve_task(task_id: str, approval: ApprovalRequest):
-    """User approves submission"""
-    task = Task.get(task_id)
-    task.approved = True
-    task.save()
-    return {"status": "approved"}
-
-@app.websocket("/ws/{task_id}")
-async def websocket_endpoint(websocket: WebSocket, task_id: str):
-    """Real-time updates for UI"""
-    await websocket.accept()
-    async for update in task.stream_updates():
-        await websocket.send_json(update)
-```
-
-#### 2.3 Browser Orchestrator
-
-**Architecture:**
-```python
-# orchestrator/service.py
-
-class TaskOrchestrator:
-    """Main OODA loop: Observe → Orient → Decide → Act"""
-    
-    async def run(self, task_id: str):
-        task = Task.get(task_id)
-        
-        # Phase 1: Analyze
-        analyzer = JobAnalyzer()
-        form_data = await analyzer.analyze_page(task.url)
-        
-        # Phase 2: Decide
-        planner = FormPlanner()
-        plan = planner.create_plan(form_data)
-        
-        # Phase 3: Execute
-        browser = BrowserSession()
-        await browser.navigate(task.url)
-        
-        for step in plan:
-            result = await self.execute_step(browser, step)
-            if not result.success:
-                # Reflect and retry
-                new_step = await self.reflect_and_retry(
-                    browser, step, result.error
-                )
-                result = await self.execute_step(browser, new_step)
-            
-            task.add_action(result)
-            task.update_screenshot(await browser.screenshot())
-        
-        # Phase 4: Await Approval
-        task.status = "awaiting_approval"
-        task.save()
-        
-        # Wait for user approval
-        while not task.approved:
-            await asyncio.sleep(1)
-        
-        # Phase 5: Submit
-        await browser.submit()
-        task.status = "completed"
-        task.save()
-
-class FormPlanner:
-    """Convert form analysis → execution plan"""
-    
-    def create_plan(self, form_data: FormAnalysis) -> List[Action]:
-        """
-        form_data = {
-            "fields": [
-                {"name": "Full Name", "type": "text", "required": True},
-                {"name": "Email", "type": "email", "required": True},
-                {"name": "Cover Letter", "type": "textarea", "required": False},
-                {"name": "Submit", "type": "button"}
-            ]
-        }
-        
-        Output:
-        [
-            Action(type="fill", field="Full Name", value="Alice Chen"),
-            Action(type="fill", field="Email", value="alice@example.com"),
-            Action(type="ask_user", field="Cover Letter", 
-                   question="Would you like to add a cover letter?"),
-            Action(type="click", target="Submit")
-        ]
-        """
-        plan = []
-        
-        for field in form_data["fields"]:
-            if field["type"] == "button":
-                plan.append(Action(type="click", target=field["name"]))
-            elif field["required"]:
-                plan.append(Action(
-                    type="fill",
-                    field=field["name"],
-                    value=self.get_default_value(field)
-                ))
-            else:
-                plan.append(Action(
-                    type="ask_user",
-                    field=field["name"],
-                    question=f"Should we fill '{field['name']}'?"
-                ))
-        
-        return plan
-```
-
-#### 2.4 Hardcoded User Data (MVP)
-
-**For Phase 1, hardcode a user profile:**
-```python
-# data/user_profile.py
-
-USER_DATA = {
-    "full_name": "Alice Chen",
-    "email": "alice@example.com",
-    "phone": "+1-555-0123",
-    "location": "San Francisco, CA",
-    "experience": [
-        {
-            "role": "Software Engineer",
-            "company": "Acme Corp",
-            "years": "2021-2023",
-            "description": "Built backend services..."
-        }
-    ],
-    "skills": ["Python", "React", "PostgreSQL"],
-    "education": {
-        "school": "UC Berkeley",
-        "degree": "BS Computer Science",
-        "graduation": "2021"
-    }
-}
-```
-
-#### 2.5 Simple Form Filling
-
-**Matching algorithm for Phase 1:**
-```python
-# form_filling/matcher.py
-
-class FieldMatcher:
-    """Simple regex-based field matching"""
-    
-    FIELD_PATTERNS = {
-        "full_name": ["name", "full name", "your name"],
-        "email": ["email", "email address"],
-        "phone": ["phone", "phone number", "contact number"],
-        "location": ["location", "city", "address"],
-    }
-    
-    def match_field(self, form_field_label: str) -> Optional[str]:
-        """Match form field to user data field"""
-        label_lower = form_field_label.lower()
-        
-        for user_field, patterns in self.FIELD_PATTERNS.items():
-            for pattern in patterns:
-                if pattern in label_lower:
-                    return user_field
-        
-        return None
-    
-    def get_value(self, field_name: str) -> str:
-        """Get value from USER_DATA"""
-        return USER_DATA.get(field_name, "")
-```
-
-**Phase 2 enhancement:** Replace with semantic matching using embeddings.
-
----
-
-### 2.6 Phase 1 Technical Checklist
-
-**Backend:**
-- [ ] FastAPI service with /task endpoints
-- [ ] Celery task queue for async operations
-- [ ] TaskOrchestrator OODA loop
-- [ ] FormAnalyzer DOM parser
-- [ ] FormPlanner step generator
-- [ ] Playwright browser control
-- [ ] Screenshot capture after each action
-- [ ] Simple field matcher (regex-based)
-
-**Chrome Extension:**
-- [ ] Side panel UI (HTML/CSS/JS)
-- [ ] "Apply to this job" context menu
-- [ ] Task status polling
-- [ ] Screenshot viewer
-- [ ] Approval modal with "Yes/No/Review"
-- [ ] Progress indicator
-- [ ] Communication with backend
-
-**Database:**
-- [ ] Task table (id, status, url, created_at, approved_at)
-- [ ] Action table (id, task_id, type, field, value, screenshot)
-- [ ] User profile table (hardcoded for Phase 1)
-
-**Integration Tests:**
-- [ ] End-to-end test on staging job board
-- [ ] Form filling accuracy test
-- [ ] Approval flow test
-- [ ] Screenshot capture test
-
-**Success Criteria (none of these have been attempted yet):**
-- [ ] Can fill and submit job application on LinkedIn/Indeed
-- [ ] User gets screenshot before approval
-- [ ] Activity timeline shows all steps
-- [ ] Recovery works if page structure changes mid-task
-
----
-
-## 3. Phase 2 Preview: Personal Brain (3-4 weeks)
-
-### High-Level Changes
-
-**What's New:**
-- Personal Brain data model + storage
-- CV/Resume parsing + upload
-- Smart form filling (semantic matching instead of regex)
-- Smart project selection (based on job requirements)
-- Dynamic CV generation
-
-**New Files:**
-```
-app/
-├── personal_brain/
-│   ├── models.py (Project, Experience, Skill, Document)
-│   ├── service.py (CRUD operations)
-│   ├── parser.py (Parse CV/resume PDF → structured data)
-│   └── semantic_search.py (Embeddings + similarity search)
-├── cv_generator/
-│   ├── templates.py (CV templates/formats)
-│   ├── generator.py (Generate tailored CV)
-│   └── style_preserver.py (Maintain user's formatting)
-└── project_selector/
-    ├── matcher.py (Semantic project-job matching)
-    └── ranker.py (Rank projects by relevance)
-```
-
-**API Changes:**
-```python
-@app.post("/brain/projects")
-async def add_project(project: ProjectInput):
-    """Add project to Personal Brain"""
-    
-@app.post("/brain/upload-cv")
-async def upload_cv(file: UploadFile):
-    """Parse CV and populate Personal Brain"""
-    
-@app.get("/cv/generate")
-async def generate_cv(job_description: str) -> bytes:
-    """Generate tailored CV for job"""
-    
-@app.post("/answer/generate")
-async def generate_answer(question: str, context: str) -> str:
-    """Generate application answer"""
-```
-
----
-
-## 4. Repository Structure
+## 2. Repository layout
 
 ```
 haru/
-├── backend/
-│   ├── app/
-│   │   ├── main.py (FastAPI app)
-│   │   ├── models.py (SQLAlchemy models)
-│   │   ├── schemas.py (Pydantic models)
-│   │   ├── orchestrator/
-│   │   │   ├── service.py
-│   │   │   ├── planner.py
-│   │   │   └── executor.py
-│   │   ├── browser/
-│   │   │   ├── session.py
-│   │   │   ├── tools.py
-│   │   │   └── recovery.py
-│   │   ├── form_filling/
-│   │   │   ├── analyzer.py
-│   │   │   └── matcher.py
-│   │   ├── personal_brain/ (Phase 2)
-│   │   ├── cv_generator/ (Phase 2)
-│   │   └── project_selector/ (Phase 2)
-│   ├── tests/
-│   │   ├── test_orchestrator.py
-│   │   ├── test_form_filling.py
-│   │   └── test_e2e.py
-│   ├── requirements.txt
-│   ├── .env.example
-│   └── docker-compose.yml
-├── extension/
-│   ├── manifest.json
-│   ├── side-panel/
-│   │   ├── panel.html
-│   │   ├── panel.css
-│   │   └── panel.js
-│   ├── content-script.js
-│   ├── background-service-worker.js
-│   └── assets/
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SETUP.md
-│   └── API.md
+├── engine/                          # Python — the product
+│   ├── haru/
+│   │   ├── brain/                   # M0
+│   │   │   ├── models.py            # Pydantic schema (PRD §6.2)
+│   │   │   ├── store.py             # SQLite persistence
+│   │   │   ├── provenance.py        # source + confidence + confirmation
+│   │   │   ├── review_queue.py      # nothing enters confirmed unreviewed
+│   │   │   └── importers/
+│   │   │       ├── cv.py            # PDF/DOCX → facts
+│   │   │       ├── github.py
+│   │   │       ├── devpost.py
+│   │   │       └── linkedin_export.py
+│   │   ├── vault/                   # M0 — encrypted documents, expiry
+│   │   ├── validation/              # M1 — BUILD BEFORE ANY GENERATION
+│   │   │   ├── fact_boundary.py
+│   │   │   ├── cliche.py
+│   │   │   ├── leakage.py
+│   │   │   └── repo_grounding.py    # M6 — claims vs actual code
+│   │   ├── cv/                      # M2
+│   │   │   ├── template.py          # layout, slots, headings
+│   │   │   ├── content.py           # selection + ordering
+│   │   │   ├── tailor.py
+│   │   │   ├── render.py            # HTML/CSS → PDF; LaTeX path
+│   │   │   └── diff.py              # reviewable change list
+│   │   ├── execution/               # M3
+│   │   │   ├── registry.py          # typed actions
+│   │   │   ├── loop.py              # one action per turn
+│   │   │   ├── verify.py            # post-action verification (P4)
+│   │   │   ├── dom.py               # scan, stable ids, native setter
+│   │   │   ├── vision.py            # fallback
+│   │   │   ├── guard.py             # loop detection, step cap, kill switch
+│   │   │   └── session.py           # state across navigation
+│   │   ├── adapters/
+│   │   │   ├── base.py              # Ask extraction → fill → verify contract
+│   │   │   ├── job/                 # M4
+│   │   │   ├── hackathon/           # M6
+│   │   │   ├── government/          # M8
+│   │   │   ├── generic/             # M12
+│   │   │   └── sites/               # M9 — recorded deterministic workflows
+│   │   ├── discovery/               # M7 — inbox, classify, enrich, score, dedup
+│   │   ├── models/                  # M5 — router, tiers, cost meter, redaction
+│   │   ├── tracker/                 # M10
+│   │   ├── evidence/                # audit records
+│   │   └── api/                     # HTTP + WebSocket
+│   └── tests/
+├── extension/                       # TypeScript
+├── desktop/                         # Tauri/Electron shell
+├── dashboard/                       # local web UI
 ├── PRD.md
-└── IMPLEMENTATION_ROADMAP.md (this file)
+├── IMPLEMENTATION_ROADMAP.md
+└── RelatedIdeas.md
 ```
 
 ---
 
-## 5. Development Setup
+## 3. Milestone detail
 
-### 5.1 Backend Setup
+### M0 — Brain core
 
-```bash
-# Clone repo
-git clone <repo>
-cd haru/backend
+**Done when:** import a CV, review what was extracted, and have a confirmed record with provenance.
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+- Pydantic models for the full PRD §6.2 schema
+- SQLite store with migrations
+- Every fact carries `source`, `confidence`, `confirmed`, `confirmed_at`
+- Review queue — imports land unconfirmed
+- CV parsing (PDF + DOCX)
+- Encrypted vault with expiry tracking
+- JSON export
 
-# Install dependencies
-pip install -r requirements.txt
+**Watch for:** CV parsing quality varies wildly. Don't chase perfect extraction — the review
+queue is the safety net. Ship "reviewable" before "accurate."
 
-# Set up .env
-cp .env.example .env
-# Edit .env with your settings (OpenAI key, etc.)
+### M1 — Fact boundary *(before any generation exists)*
 
-# Start services
-docker-compose up -d redis postgres
+**Done when:** text claiming an unowned skill is reliably blocked, proven by adversarial tests.
 
-# Run migrations
-alembic upgrade head
+- `allowed_skills` derived from `skills[]` + evidence links
+- Blocking check against orgs, projects, institutions, metrics
+- **Credentials: exact match against `credentials[]` with a document, no fuzzy allowance**
+- Cliché list (seed from ApplyPilot's, extend)
+- Leakage phrases — always blocking
+- Modes: strict / normal / lenient — the fact-boundary check is **not** relaxable in any mode
+- Regenerate-with-feedback loop, capped, then escalate to the user
 
-# Start FastAPI server
-uvicorn app.main:app --reload
+**Test approach:** a corpus of deliberate fabrications — invented certs, inflated metrics,
+plausible-but-unowned frameworks, fabricated employers. Aim for zero escapes on the blocking
+checks. This is the test suite that matters most in the whole product.
 
-# In another terminal, start Celery worker
-celery -A app.tasks worker --loglevel=info
-```
+### M2 — CV engine
 
-### 5.2 Extension Setup
+**Done when:** two different jobs produce two different CVs with byte-identical styling.
 
-```bash
-cd haru/extension
+- Template model: layout, slots, section order, heading labels
+- Three import paths (auto-extract / bring-your-own / starter)
+- Content selection driven by semantic match against the Ask
+- Renderer: HTML/CSS → PDF via headless Chrome; LaTeX path for existing LaTeX users
+- Diff view with per-change attribution and individual veto
+- Multiple named templates
 
-# Install dependencies
-npm install
+**Watch for:** scope creep into a CV builder. Haru selects and arranges; it is not a design tool.
 
-# Build extension
-npm run build
+### M3 — Execution core
 
-# Load unpacked extension
-# Chrome: Settings → Extensions → Load unpacked → select `haru/extension/dist`
-```
+**Done when:** a React-based ATS form is filled with every field verified.
 
-### 5.3 Testing
+- Typed action registry with declared preconditions and verification
+- One-action-per-turn loop
+- Post-action verification for every action type (PRD §12.3)
+- Native value setter + `input`/`change` events (PRD §12.4) — **write this test first, against a
+  real React form**
+- Stable element IDs; loop guard with nudge-before-abort
+- Step cap, kill switch
+- State persistence across navigation
+- DOM → vision fallback
 
-```bash
-# Run backend tests
-pytest tests/ -v
+**Watch for:** this is where the hard bugs live. Budget more than feels reasonable.
 
-# Run integration test (needs staging job board account)
-pytest tests/test_e2e.py -v
+### M4 — Job adapter
 
-# Test form filling on real website
-python -m pytest tests/test_form_filling.py::test_linkedin_application -v
-```
+First real end-to-end. Greenhouse and Lever first (cleanest, both React), Workday later (hardest).
 
----
+Extraction → matching → generation (gated by M1) → approval preview → submit → evidence.
 
-## 6. Risk Mitigation
+### M5 — Local model router
 
-### Technical Risks
+**Done when:** a complete application runs with no API key at zero cost.
 
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|-----------|
-| **Bot detection blocks us** | **High** | **Critical** | Reuse user's logged-in session, never automate login, human pacing, run in user's own browser. See PRD §8b.1 |
-| **ToS violation → user account ban** | **Medium** | **Critical** | Disclose before first run, human approval on every submit, per-platform acknowledgement. See PRD §8b.2 |
-| **LLM fabricates on a resume** | **High** | **Critical** | Fact-boundary validator before any content reaches a form. See PRD §4.7b |
-| **ApplyPilot already does this** | **Certain** | **High** | Differentiate on UX/human-in-loop/breadth, or contribute upstream. See PRD §11 |
-| Form structure varies by website | High | High | DOM + vision fallback, test on 3+ sites |
-| Browser session crashes | Medium | High | Watchdog pattern from Browser Use, auto-recovery |
-| LLM costs (cloud API) | Medium | Medium | Use local LLM for MVP, add cost controls |
-| Data privacy (Personal Brain) | Low | High | Encrypt local storage, never send to cloud |
-| Approval gate UX friction | High | Medium | WebSocket real-time updates, clear screenshots |
+Hardware probe, T0–T2 local, T3 opt-in, cost meter, redaction layer, cloud-call log.
+Enforce: raw PII never leaves the device; high-stakes mode blocks T3.
 
-### Mitigation Strategies
+### M6 — Hackathon adapter
 
-1. **Form Variation:** Implement hybrid DOM + vision detection
-2. **Browser Crashes:** Use Browser Use's watchdog pattern + circuit breakers
-3. **LLM Costs:** Start with local Ollama, add cloud option later
-4. **Privacy:** Encrypt Personal Brain DB, add opt-in cloud sync only
-5. **UX:** Real-time WebSocket updates, show before/after screenshots
+Repo ingestion (README, languages, commits, structure), Devpost field extraction, story
+generation, and **repo-grounded validation** — claims checked against actual code, plus flagging
+real work the draft omitted.
 
----
+### M7 — Opportunity Inbox
 
-## 7. Success Metrics for Phase 1
+Capture button, forward-in, classification, three-tier enrichment (JSON-LD → selectors → model),
+scoring, dedup, deadline extraction. **No auto-submit from discovery, ever.**
 
-> These are **targets to aim at**, not measurements. Nothing has been built or measured yet.
-> The thresholds below are guesses and should be re-set to something defensible once we have
-> a first run against a real job board.
+### M8 — Government adapter
 
-### Quantitative targets
-- Form fill accuracy: > 90% (hardcoded + simple matching)
-- Task completion rate: > 80% (successful applications submitted)
-- Time to complete: < 2 minutes per application
-- Browser crash recovery: > 95% success rate
-- Test coverage: > 70% (backend)
+High-stakes mode: 0.95 confidence threshold, field-by-field review, no cloud models, minimal
+prose, full audit record. Document extraction for ID/passport/transcripts.
 
-### Qualitative targets
-- Approval UX is frictionless
-- Screenshots clearly show what was filled
-- Error messages are helpful
-- Extension UI is intuitive
+### M9 — Deterministic adapters
+
+Recording, replay, healing. Target: tenth application to a known ATS uses zero tokens.
+
+### M10–M12
+
+Tracker with honest sample-size reporting · chat surface · generic form fallback.
 
 ---
 
-## 8. Transition to Phase 2
+## 4. Test strategy
 
-**Prerequisites for Phase 2:**
-- Phase 1 is stable and tested
-- Team has experience with codebase
-- Personal Brain data model designed
-- LLM integration strategy confirmed
+| Layer | Approach |
+| --- | --- |
+| **Fact boundary** | Adversarial corpus. Highest-priority suite in the codebase. |
+| **Execution** | Fixture pages reproducing real ATS behavior — React controlled inputs, custom dropdowns, multi-page flows, file uploads |
+| **Adapters** | Recorded HTTP + saved DOM snapshots; no live sites in CI |
+| **CV render** | Golden-file PDF comparison to catch styling drift |
+| **End-to-end** | Manual, against real sites, using dry-run mode. Never in CI. |
 
-**Phase 2 Kickoff Checklist:**
-- [ ] Review Phase 1 metrics
-- [ ] Refactor Form Planner for semantic matching
-- [ ] Build Personal Brain service
-- [ ] Add CV template system
-- [ ] Implement embedding-based project matching
-- [ ] Design Personal Brain upload/management UI
+**Dry-run mode is a first-class feature, not a test flag** — fill everything, submit nothing.
 
 ---
 
-## Appendix: Dependencies
+## 5. Per-milestone definition of done
 
-> **Unverified.** The version numbers below were written from memory and have **not** been
-> checked against PyPI/npm. Resolve real versions with `pip index` / `npm view` before pinning.
-> Treat this as a package list, not a lockfile.
+Applies to every milestone, per [CLAUDE.md](CLAUDE.md):
 
-### Backend (packages, versions TBD)
-```
-fastapi
-celery
-redis
-sqlalchemy
-pydantic
-playwright
-browser-use
-ollama          # local LLM
-anthropic       # cloud LLM (optional)
-pdf2image       # CV parsing
-pytesseract     # OCR
-chromadb        # vector embeddings
-pytest
-pytest-asyncio
-```
+1. Feature implemented
+2. Tests written and passing
+3. Committed and pushed (5–6 word message, no Claude attribution)
 
-### Extension (packages, versions TBD)
-```
-react
-typescript
-webpack
-tailwindcss
-```
+A milestone is not done until something demonstrably works end-to-end. No milestone lands as
+scaffolding only.
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** 2026-08-10  
-**Status:** Ready for Engineering Sprint Planning
+## 6. Immediate next steps
+
+1. Decide the open questions in PRD §20 that block M0 — specifically license and whether the
+   Brain is single or multi-profile (it changes the schema).
+2. Scaffold `engine/` and get the API skeleton running.
+3. Write the Brain schema from PRD §6.2.
+4. Build the adversarial fabrication corpus **before** the validator, so M1 has a real target.
+
+---
+
+## 7. Deferred decisions
+
+Not blocking, but don't let them ambush us later:
+
+- Sync/backup across the user's own machines (must preserve P2 — user owns the data)
+- Sharing site adapters between users (trust and review model)
+- Whether the desktop shell is Tauri or Electron (decide at M3, when the engine's real needs are known)
+- Packaging and distribution
