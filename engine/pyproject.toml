@@ -32,4 +32,8 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "live: needs a running Ollama; slow, skipped by default",
+]
+addopts = "-m 'not live'"
 pythonpath = ["src"]
