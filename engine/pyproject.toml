@@ -9,6 +9,7 @@ description = "Your facts and documents, carried onto any form on the web."
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2",
+    "cryptography>=42",
 ]
 
 [project.optional-dependencies]
