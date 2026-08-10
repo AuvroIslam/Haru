@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+import uuid
 from pathlib import Path
 from typing import Iterable, Sequence, TypeVar
 
@@ -124,10 +125,11 @@ def connect(path: Path | str) -> sqlite3.Connection:
         except sqlite3.ProgrammingError:
             cache.pop(key, None)
 
-    if key != ":memory:":
+    is_uri = key.startswith("file:")
+    if key != ":memory:" and not is_uri:
         Path(key).parent.mkdir(parents=True, exist_ok=True)
 
-    conn = sqlite3.connect(key, timeout=30)
+    conn = sqlite3.connect(key, timeout=30, uri=is_uri)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=10000")
@@ -194,7 +196,17 @@ class BrainStore:
     """Read/write access to one Brain database."""
 
     def __init__(self, path: Path | str = ":memory:") -> None:
-        self.path = str(path)
+        # Connections are per-thread, and a plain ":memory:" database is
+        # per-connection — so a second thread would silently open an empty one
+        # and see none of the data. A uniquely named shared-cache URI gives
+        # every thread the same in-memory database while keeping separate
+        # BrainStore instances isolated from each other.
+        if str(path) == ":memory:":
+            self.path = f"file:haru-{uuid.uuid4().hex}?mode=memory&cache=shared"
+        else:
+            self.path = str(path)
+        # Held open for the lifetime of the store: a shared-cache in-memory
+        # database is discarded when its last connection closes.
         self._conn = connect(self.path)
 
     @property

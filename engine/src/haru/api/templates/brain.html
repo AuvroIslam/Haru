@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Brain — Haru{% endblock %}
+
+{% block content %}
+<h1>Review queue</h1>
+<p class="sub">
+  Imported facts stay unconfirmed until you accept them. Nothing unconfirmed can
+  back a claim in anything Haru writes.
+</p>
+
+{% if items %}
+  {# Sorted by how much attention each needs (ReviewQueue.pending). #}
+  {% for entry in items %}
+  <div class="card">
+    <div class="row">
+      <span><strong>{{ entry.record.name if entry.record.name is defined else entry.record.id }}</strong>
+        <span class="pill">{{ entry.kind }}</span>
+      </span>
+      <span class="spacer"></span>
+      <span class="conf">{{ "%.0f%%" | format(entry.confidence * 100) }} confident</span>
+    </div>
+
+    {% if entry.reasons %}
+    <div class="meta" style="margin-top:6px">
+      {% for reason in entry.reasons %}<div>— {{ reason }}</div>{% endfor %}
+    </div>
+    {% endif %}
+
+    <form class="actions" method="post" action="/brain/{{ entry.record.id }}">
+      <span class="spacer"></span>
+      <button class="primary" type="submit" name="action" value="confirm">Confirm</button>
+      <button class="danger" type="submit" name="action" value="reject">Discard</button>
+    </form>
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="empty">Nothing to review. Every stored fact has been confirmed.</div>
+{% endif %}
+
+{% if counts %}
+<h2>Stored</h2>
+<div class="card">
+  {% for kind, total in counts.items() %}
+  <div class="row"><span>{{ kind.replace("_", " ") }}</span><span class="spacer"></span><span class="meta">{{ total }}</span></div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

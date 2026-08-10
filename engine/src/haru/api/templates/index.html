@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Queue — Haru{% endblock %}
+
+{% block content %}
+<h1>Awaiting your decision</h1>
+<p class="sub">
+  {{ pending | length }} pending
+  {% if review_count %} · <a href="/brain">{{ review_count }} facts to review</a>{% endif %}
+</p>
+
+{% if pending %}
+  {# Most demanding first, so the routine tail collects at the bottom
+     where it can be handled together (PRD §14.4). #}
+  {% for item in pending %}
+  <div class="card">
+    <div class="row">
+      <a class="title" href="/approve/{{ item.id }}">{{ item.title }}</a>
+      <span class="spacer"></span>
+      {% if item.plan.blockers() %}
+        <span class="pill stop">{{ item.plan.blockers() | length }} blocking</span>
+      {% else %}
+        <span class="pill ok">ready</span>
+      {% endif %}
+    </div>
+    <div class="meta">
+      {{ item.plan.fit.summary() }} ·
+      {{ item.plan.to_fill | length }} filled ·
+      {{ item.plan.to_ask | length }} need you
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="empty">Nothing waiting. Start an application and it will appear here.</div>
+{% endif %}
+
+{% if decided %}
+<h2>Recent decisions</h2>
+{% for item in decided %}
+<div class="card">
+  <div class="row">
+    <span>{{ item.title }}</span>
+    <span class="spacer"></span>
+    <span class="pill {{ 'ok' if item.status.value == 'approved' else '' }}">{{ item.status.value }}</span>
+  </div>
+  {% if item.note %}<div class="meta">{{ item.note }}</div>{% endif %}
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

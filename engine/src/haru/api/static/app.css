@@ -1,0 +1,135 @@
+/* Haru control panel.
+   One stylesheet, no build step, no external fonts — it must render
+   identically inside a plain webview with no network. */
+
+:root {
+  --bg: #fbfaf8;
+  --panel: #ffffff;
+  --ink: #1d1f21;
+  --muted: #6b7075;
+  --line: #e3e0da;
+  --accent: #1f3a5f;
+  --ok: #2c6e49;
+  --warn: #8a6100;
+  --stop: #9b2226;
+  --ok-bg: #edf6f0;
+  --warn-bg: #fdf6e3;
+  --stop-bg: #fbeeee;
+  --radius: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17191c; --panel: #1f2226; --ink: #e8e6e3; --muted: #9aa0a6;
+    --line: #32363b; --accent: #8fb2dd; --ok: #7fc9a0; --warn: #e0b95f;
+    --stop: #e08a8a; --ok-bg: #1c2a22; --warn-bg: #2b2519; --stop-bg: #2c1e1e;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.bar {
+  display: flex; align-items: center; gap: 18px;
+  padding: 12px 22px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.brand { font-weight: 700; font-size: 17px; color: var(--ink); text-decoration: none; letter-spacing: .01em; }
+.bar nav { display: flex; gap: 16px; }
+.bar a { color: var(--muted); text-decoration: none; }
+.bar nav a:hover { color: var(--ink); }
+.spacer { flex: 1; }
+.local {
+  font-size: 12px; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 99px; padding: 2px 10px;
+}
+
+main { max-width: 860px; margin: 0 auto; padding: 26px 22px 70px; }
+
+h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 15px; margin: 26px 0 10px; text-transform: uppercase;
+     letter-spacing: .07em; color: var(--muted); }
+p.sub { color: var(--muted); margin: 0 0 20px; }
+
+.banner {
+  padding: 11px 22px; font-size: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.banner.warn { background: var(--warn-bg); color: var(--warn); }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+.card.stack { display: block; }
+.card a.title { color: var(--ink); text-decoration: none; font-weight: 600; }
+.card a.title:hover { text-decoration: underline; }
+
+.row { display: flex; align-items: baseline; gap: 12px; }
+.row .spacer { flex: 1; }
+
+.meta { color: var(--muted); font-size: 13px; }
+
+.pill {
+  display: inline-block; font-size: 12px; padding: 2px 9px;
+  border-radius: 99px; border: 1px solid var(--line); color: var(--muted);
+}
+.pill.ok   { background: var(--ok-bg);   color: var(--ok);   border-color: transparent; }
+.pill.warn { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+.pill.stop { background: var(--stop-bg); color: var(--stop); border-color: transparent; }
+
+/* Field tables — the substance of the approval page. */
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th {
+  text-align: left; font-weight: 600; color: var(--muted);
+  font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
+  padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line);
+}
+td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+td.value { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+td.why { color: var(--muted); }
+.conf { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+blockquote {
+  margin: 8px 0; padding: 10px 14px;
+  border-left: 3px solid var(--line); color: var(--ink);
+  background: var(--bg); border-radius: 0 var(--radius) var(--radius) 0;
+  white-space: pre-wrap;
+}
+
+.blockers { background: var(--stop-bg); border-color: transparent; }
+.blockers h3 { margin: 0 0 8px; font-size: 14px; color: var(--stop); }
+.blockers ul { margin: 0; padding-left: 20px; }
+.blockers li { margin-bottom: 4px; }
+
+.ready { background: var(--ok-bg); border-color: transparent; color: var(--ok); }
+
+form.actions { display: flex; gap: 10px; align-items: center; margin-top: 18px; }
+form.actions input[type=text] {
+  flex: 1; padding: 9px 12px; font: inherit;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--panel); color: var(--ink);
+}
+button {
+  font: inherit; font-weight: 600; cursor: pointer;
+  padding: 9px 18px; border-radius: var(--radius);
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+}
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary:disabled { opacity: .45; cursor: not-allowed; }
+button.danger { color: var(--stop); }
+
+.inline { display: inline; }
+.empty { color: var(--muted); padding: 26px 0; text-align: center; }

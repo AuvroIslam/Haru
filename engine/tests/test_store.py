@@ -234,3 +234,55 @@ class TestPersistenceAndSchema:
         # Renaming these strings silently orphans existing rows.
         assert record_kind(Project) == "project"
         assert record_kind(Credential) == "credential"
+
+
+class TestThreadSafety:
+    """Connections are per-thread; the data must not be."""
+
+    def test_in_memory_store_is_visible_from_another_thread(self):
+        """Regression: a plain ':memory:' DB is per-connection.
+
+        The server runs in its own thread, so it opened an empty database and
+        silently showed nothing — data loss with no error anywhere.
+        """
+        import threading
+
+        store = BrainStore()
+        store.put(Project(name="written on main thread", provenance=confirmed()))
+
+        seen: list[str] = []
+
+        def read():
+            seen.extend(p.name for p in store.list(Project))
+
+        thread = threading.Thread(target=read)
+        thread.start()
+        thread.join()
+
+        assert seen == ["written on main thread"]
+        store.close()
+
+    def test_separate_in_memory_stores_stay_isolated(self):
+        a, b = BrainStore(), BrainStore()
+        try:
+            a.put(Project(name="only in a", provenance=confirmed()))
+            assert b.list(Project) == []
+        finally:
+            a.close()
+            b.close()
+
+    def test_file_store_is_visible_across_threads(self, tmp_path):
+        import threading
+
+        store = BrainStore(tmp_path / "shared.sqlite")
+        store.put(Project(name="on disk", provenance=confirmed()))
+
+        seen: list[str] = []
+        thread = threading.Thread(
+            target=lambda: seen.extend(p.name for p in store.list(Project))
+        )
+        thread.start()
+        thread.join()
+
+        assert seen == ["on disk"]
+        store.close()

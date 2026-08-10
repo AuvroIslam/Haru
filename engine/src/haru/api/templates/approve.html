@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}{{ item.title }} — Haru{% endblock %}
+
+{% block content %}
+<h1>{{ item.title }}</h1>
+<p class="sub">
+  {{ plan.fit.summary() }}
+  {% if plan.url %} · <span class="meta">{{ plan.url }}</span>{% endif %}
+</p>
+
+{% if error %}
+<div class="card blockers">
+  <h3>{{ error }}</h3>
+  {% if error_details %}
+  <ul>{% for reason in error_details %}<li>{{ reason }}</li>{% endfor %}</ul>
+  {% endif %}
+</div>
+{% endif %}
+
+{# Everything that will be entered, with the exact value. PRD §14.2 — a
+   yes/no dialog is not consent. #}
+{% if plan.to_fill %}
+<h2>Will be entered ({{ plan.to_fill | length }})</h2>
+<div class="card">
+  <table>
+    <tr><th>Field</th><th>Value</th><th>Confidence</th></tr>
+    {% for field in plan.to_fill %}
+    <tr>
+      <td>{{ field.label }}</td>
+      <td class="value">{{ field.match.value }}</td>
+      <td class="conf">{{ "%.0f%%" | format(field.match.confidence * 100) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% if plan.to_ask %}
+<h2>Needs you ({{ plan.to_ask | length }})</h2>
+<div class="card">
+  <table>
+    <tr><th>Field</th><th>Why</th><th></th></tr>
+    {% for field in plan.to_ask %}
+    <tr>
+      <td>
+        {{ field.label }}
+        {% if field.element.required %}<span class="pill stop">required</span>{% endif %}
+        {% if field.match.sensitive %}<span class="pill warn">sensitive</span>{% endif %}
+      </td>
+      <td class="why">{{ field.reason }}</td>
+      <td class="value">{{ field.match.value or "" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% if plan.documents %}
+<h2>Documents</h2>
+<div class="card">
+  {% for document in plan.documents %}<div>{{ document }}</div>{% endfor %}
+</div>
+{% endif %}
+
+{% if plan.generated %}
+<h2>Generated text</h2>
+{% for question, answer in plan.generated.items() %}
+<div class="card stack">
+  <div class="meta">{{ question }}</div>
+  <blockquote>{{ answer }}</blockquote>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if plan.fit.missing %}
+<h2>Not on file</h2>
+<div class="card">
+  <p class="meta" style="margin:0">
+    The posting mentions {{ plan.fit.missing | join(", ") }}, which you have not
+    confirmed in your Brain. Nothing will claim them.
+  </p>
+</div>
+{% endif %}
+
+{% set blockers = plan.blockers() %}
+{% if blockers %}
+<div class="card blockers">
+  <h3>Not ready to submit</h3>
+  <ul>{% for reason in blockers %}<li>{{ reason }}</li>{% endfor %}</ul>
+</div>
+{% else %}
+<div class="card ready"><strong>Ready.</strong> Nothing will be submitted until you approve.</div>
+{% endif %}
+
+{% if item.status.value == "pending" %}
+<form class="actions" method="post" action="/approve/{{ item.id }}">
+  <input type="text" name="note" placeholder="Note (optional)" autocomplete="off">
+  <button class="primary" type="submit" name="action" value="approve"
+          {% if blockers %}disabled title="Resolve the blockers above first"{% endif %}>
+    Approve &amp; submit
+  </button>
+  <button class="danger" type="submit" name="action" value="reject">Reject</button>
+</form>
+<p class="meta" style="margin-top:10px">
+  Expires {{ (item.created_at + item.ttl).strftime("%d %b %H:%M") }} if left undecided.
+</p>
+{% else %}
+<div class="card"><span class="pill">{{ item.status.value }}</span>
+  {% if item.note %} <span class="meta">{{ item.note }}</span>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

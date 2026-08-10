@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Haru{% endblock %}</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="bar">
+  <a class="brand" href="/">Haru</a>
+  <nav>
+    <a href="/">Queue</a>
+    <a href="/brain">Brain</a>
+  </nav>
+  <span class="spacer"></span>
+  <span class="local" title="Everything runs on this machine">local</span>
+</header>
+
+{% if validation_stubbed %}
+<div class="banner warn">
+  <strong>Validation is stubbed.</strong>
+  Generated text is not being checked against your fact boundary, so nothing can
+  be submitted. Install the validator to enable submission.
+</div>
+{% endif %}
+
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>
