@@ -37,9 +37,24 @@ Attach to the user's real Chrome profile rather than launching a clean automatio
 Follows PRD P7 and §12.7: existing session, no stored passwords, no login automation.
 
 - **Playwright** for control (mature, typed, good CDP access)
-- **Browser Use** consulted for its watchdog/recovery patterns; adopt the pattern, depend on the
-  library only where it earns its place
 - Extension provides in-page capabilities CDP can't reach cleanly (capture button, side panel, overlay)
+
+**Executor interface — decided.** Browser control sits behind our own protocol so the agent
+never owns the loop (PRD §12.2 requires one-action-per-turn under *our* orchestration):
+
+```
+Executor (our protocol)
+├── PlaywrightExecutor    ← deterministic replay, known ATS, zero tokens
+└── BrowserUseExecutor    ← agent fallback, unknown pages only (added when first needed)
+```
+
+**Do not take the Browser Use dependency yet.** M4 targets Greenhouse and Lever — known forms
+with stable selectors, where precision beats intelligence and Playwright alone is faster and more
+predictable. Browser Use earns its place at the first genuinely unknown page. Deferring means the
+interface is designed against real requirements rather than guesses.
+
+**Licence posture for all references:** ApplyPilot (AGPL-3.0) and Cognito (BUSL-1.1) are **read-only**.
+Study the approach, write our own code. Only MIT dependencies (Playwright, Browser Use) may be linked.
 
 ### 1.4 Execution model
 
@@ -174,7 +189,9 @@ queue is the safety net. Ship "reviewable" before "accurate."
 - `allowed_skills` derived from `skills[]` + evidence links
 - Blocking check against orgs, projects, institutions, metrics
 - **Credentials: exact match against `credentials[]` with a document, no fuzzy allowance**
-- Cliché list (seed from ApplyPilot's, extend)
+- Cliché list — **write our own.** ApplyPilot is AGPL-3.0 and its specific word
+  lists are copyrightable expression. Take the *categories* it demonstrates (LLM clichés,
+  model-leak phrases, unverifiable-credential claims); never copy its text.
 - Leakage phrases — always blocking
 - Modes: strict / normal / lenient — the fact-boundary check is **not** relaxable in any mode
 - Regenerate-with-feedback loop, capped, then escalate to the user

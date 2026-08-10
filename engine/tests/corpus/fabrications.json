@@ -1,0 +1,263 @@
+{
+  "_comment": [
+    "Adversarial corpus for the fact-boundary validator (PRD §10.2, M3).",
+    "Written during M0, deliberately BEFORE the validator exists, so the",
+    "detectors are graded against a target they did not author.",
+    "",
+    "'block' cases are fabrications that must never reach a form.",
+    "'pass' cases are honest text that must NOT be blocked — false positives",
+    "are their own failure. A validator that rejects true statements gets",
+    "switched off, and then it protects nobody."
+  ],
+
+  "boundary": {
+    "allowed_skills": [
+      "python", "fastapi", "sqlite", "postgresql", "docker", "pytest", "git", "linux"
+    ],
+    "preserved_orgs": ["Northwind Systems", "Cedar Analytics"],
+    "preserved_projects": ["Haru", "Ledgerline"],
+    "preserved_institutions": ["University of Dhaka"],
+    "claimable_credentials": ["AWS Certified Cloud Practitioner"],
+    "real_metrics": ["40% faster", "12000 rows/sec", "3 person team"]
+  },
+
+  "cases": [
+    {
+      "id": "cert-invented",
+      "kind": "cv_summary",
+      "text": "AWS Certified Solutions Architect with five years of cloud experience.",
+      "expect": "block",
+      "check": "credential",
+      "why": "Holds Cloud Practitioner, not Solutions Architect. Certifications are binary and verifiable."
+    },
+    {
+      "id": "cert-adjacent-upgrade",
+      "kind": "cv_summary",
+      "text": "AWS Certified Developer, with hands-on Docker experience.",
+      "expect": "block",
+      "check": "credential",
+      "why": "A different AWS certification is still one they do not hold."
+    },
+    {
+      "id": "cert-held",
+      "kind": "cv_summary",
+      "text": "AWS Certified Cloud Practitioner with production Docker experience.",
+      "expect": "pass",
+      "why": "Exactly the credential on file, plus an allowed skill."
+    },
+    {
+      "id": "cert-vague-claim",
+      "kind": "cover_letter",
+      "text": "I am a certified cloud professional.",
+      "expect": "block",
+      "check": "credential",
+      "why": "Unspecific certification language still asserts a credential."
+    },
+
+    {
+      "id": "skill-unowned-framework",
+      "kind": "cv_bullet",
+      "text": "Built REST services in Django and Spring Boot.",
+      "expect": "block",
+      "check": "fact_boundary",
+      "why": "Django and Spring Boot are not in the boundary; FastAPI is."
+    },
+    {
+      "id": "skill-unowned-language",
+      "kind": "cv_bullet",
+      "text": "Wrote high-performance data pipelines in Rust and Go.",
+      "expect": "block",
+      "check": "fact_boundary",
+      "why": "Neither language is evidenced anywhere in the Brain."
+    },
+    {
+      "id": "skill-owned",
+      "kind": "cv_bullet",
+      "text": "Built REST services in Python with FastAPI, backed by PostgreSQL.",
+      "expect": "pass",
+      "why": "Every technology named is in the boundary."
+    },
+    {
+      "id": "skill-adjacent-as-context",
+      "kind": "cover_letter",
+      "text": "My Docker experience should transfer well to your Kubernetes stack.",
+      "expect": "pass",
+      "why": "Names an unowned technology as the employer's, not as the candidate's experience. PRD §10.2 allows adjacent tech as context."
+    },
+    {
+      "id": "skill-adjacent-as-claim",
+      "kind": "cv_bullet",
+      "text": "Operated production Kubernetes clusters at scale.",
+      "expect": "block",
+      "check": "fact_boundary",
+      "why": "The same technology, now claimed as experience. This is the line."
+    },
+
+    {
+      "id": "org-fabricated",
+      "kind": "cv_bullet",
+      "text": "Senior Engineer at Google, leading the payments platform.",
+      "expect": "block",
+      "check": "fact_boundary",
+      "why": "Employer not in preserved_orgs."
+    },
+    {
+      "id": "org-real",
+      "kind": "cv_bullet",
+      "text": "Backend engineer at Northwind Systems, owning the ingestion service.",
+      "expect": "pass",
+      "why": "Employer is on file."
+    },
+    {
+      "id": "institution-fabricated",
+      "kind": "cv_summary",
+      "text": "MIT graduate with a focus on distributed systems.",
+      "expect": "block",
+      "check": "fact_boundary",
+      "why": "Institution not in preserved_institutions."
+    },
+    {
+      "id": "institution-real",
+      "kind": "cv_summary",
+      "text": "Computer science graduate of the University of Dhaka.",
+      "expect": "pass",
+      "why": "Institution is on file."
+    },
+    {
+      "id": "project-fabricated",
+      "kind": "application_answer",
+      "text": "I built OpenTelemetry-Lite, a tracing library used by 200 companies.",
+      "expect": "block",
+      "check": "fact_boundary",
+      "why": "Project does not exist in the Brain."
+    },
+    {
+      "id": "project-real",
+      "kind": "application_answer",
+      "text": "I built Haru, a local-first agent that fills forms from a personal record.",
+      "expect": "pass",
+      "why": "Project is on file."
+    },
+
+    {
+      "id": "metric-invented",
+      "kind": "cv_bullet",
+      "text": "Reduced infrastructure costs by 85% in the first quarter.",
+      "expect": "block",
+      "check": "fact_boundary",
+      "why": "Not in real_metrics. Invented numbers are the most persuasive fabrication and the easiest to check."
+    },
+    {
+      "id": "metric-inflated",
+      "kind": "cv_bullet",
+      "text": "Made query performance 400% faster.",
+      "expect": "block",
+      "check": "fact_boundary",
+      "why": "The verified metric is 40% faster. Inflation of a real number is still fabrication."
+    },
+    {
+      "id": "metric-real",
+      "kind": "cv_bullet",
+      "text": "Cut query latency, making the ingestion path 40% faster.",
+      "expect": "pass",
+      "why": "Uses a verified metric verbatim."
+    },
+    {
+      "id": "metric-real-reworded",
+      "kind": "cv_bullet",
+      "text": "Sustained 12000 rows/sec through the ingestion pipeline.",
+      "expect": "pass",
+      "why": "Verified metric, different sentence. Rephrasing is allowed; the number is not changed."
+    },
+    {
+      "id": "metric-team-size-inflated",
+      "kind": "application_answer",
+      "text": "I led a team of 15 engineers on this project.",
+      "expect": "block",
+      "check": "fact_boundary",
+      "why": "Real metric says 3 person team."
+    },
+
+    {
+      "id": "leak-preamble",
+      "kind": "cover_letter",
+      "text": "Here is the revised cover letter:\n\nDear Hiring Manager, I am writing to apply.",
+      "expect": "block",
+      "check": "model_leakage",
+      "why": "Model preamble inside the deliverable. Pure output corruption."
+    },
+    {
+      "id": "leak-apology",
+      "kind": "cv_bullet",
+      "text": "I apologize for the error. Built the ingestion service in Python.",
+      "expect": "block",
+      "check": "model_leakage",
+      "why": "Model talking to itself."
+    },
+    {
+      "id": "leak-note",
+      "kind": "application_answer",
+      "text": "Note: I have updated this answer per your feedback.",
+      "expect": "block",
+      "check": "model_leakage",
+      "why": "Meta-commentary addressed to the operator, not the reader."
+    },
+    {
+      "id": "leak-lookalike-honest",
+      "kind": "cover_letter",
+      "text": "I note that your team is rebuilding its ingestion pipeline.",
+      "expect": "pass",
+      "why": "Contains the word 'note' in an ordinary sentence. Must not trip the leak detector."
+    },
+
+    {
+      "id": "cliche-stack",
+      "kind": "cover_letter",
+      "text": "I am a passionate, detail-oriented self-starter with a proven track record of spearheading robust, cutting-edge solutions.",
+      "expect": "block",
+      "check": "cliche",
+      "mode": "strict",
+      "why": "Blocking in strict mode only."
+    },
+    {
+      "id": "cliche-stack-normal-mode",
+      "kind": "cover_letter",
+      "text": "I am a passionate, detail-oriented self-starter with a proven track record.",
+      "expect": "pass",
+      "check": "cliche",
+      "mode": "normal",
+      "why": "Clichés warn but do not block in normal mode. Result carries warnings; passed stays true."
+    },
+    {
+      "id": "cliche-clean-prose",
+      "kind": "cover_letter",
+      "text": "I spent two years on ingestion at Northwind Systems and want to keep working on data infrastructure.",
+      "expect": "pass",
+      "why": "Plain, specific, honest. The target register."
+    },
+
+    {
+      "id": "empty-boundary-guard",
+      "kind": "cv_bullet",
+      "text": "Built services in Python.",
+      "expect": "block",
+      "check": "fact_boundary",
+      "boundary_override": "empty",
+      "why": "With no confirmed facts nothing may be claimed at all. An empty boundary means 'cannot generate yet', not 'no limits'."
+    },
+    {
+      "id": "case-and-punctuation-tolerance",
+      "kind": "cv_bullet",
+      "text": "Deep experience with python, postgres and DOCKER.",
+      "expect": "pass",
+      "why": "Casing and spelling variants of owned skills must not be treated as fabrication."
+    },
+    {
+      "id": "honest-negative-statement",
+      "kind": "application_answer",
+      "text": "I have not worked with Kubernetes, though I have used Docker in production.",
+      "expect": "pass",
+      "why": "Explicitly disclaims an unowned skill. Blocking this would punish honesty — the worst possible false positive."
+    }
+  ]
+}
