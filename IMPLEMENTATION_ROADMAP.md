@@ -166,11 +166,42 @@ queue is the safety net. Ship "reviewable" before "accurate."
 
 **Watch for:** scope creep into a CV builder. Haru selects and arranges; it is not a design tool.
 
+### Browser Use — verified findings for M2
+
+Read from source (2026-08-10). These are the problems it has already solved that we would
+otherwise rediscover expensively. Ideas only — MIT, but we write our own code.
+
+**Interactive-element indices.** `dom/serializer/serializer.py` assigns numeric indices to
+clickable elements and hands the model *those*, not selectors. The model says "click 7"; the
+executor resolves 7 to a node. This removes the whole class of bugs where a model invents a
+plausible CSS selector that matches nothing. **Adopt this** — it also makes our recorded
+adapters (M9) trivially replayable, since an index maps to a stored selector.
+
+**Clickability is not a CSS property.** `dom/serializer/clickable_elements.py` scores
+interactivity rather than testing one attribute, and carries two battle scars worth stealing:
+zero-size elements can still be interactive (invisible click overlays), and treating `<label>`
+as clickable can shadow the real control it points at. There is also `paint_order.py` — z-order
+decides what a click actually hits.
+
+**Watchdogs with declared contracts.** `browser/watchdog_base.py` has each watchdog declare
+`LISTENS_TO` / `EMITS` as ClassVars, then *asserts at attach time* that every declared event has
+a handler and that no handler listens to an undeclared event. A misconfigured watchdog fails
+loudly at startup instead of silently never firing. Fourteen exist: crash, security, popups,
+downloads, permissions, storage-state, DOM, screenshot, captcha, about:blank, recording, and more.
+
+**For us:** we need far fewer watchdogs than they do, but the *self-checking declaration* pattern
+is worth copying wholesale, and the crash/popup/download three are directly relevant to filling
+application forms. Cache clickability per scan pass, as they do — it is called repeatedly per
+serialization.
+
 ### M2 — Execution core
 
 **Done when:** a React-based ATS form is filled with every field verified.
 
 - Typed action registry with declared preconditions and verification
+- **Interactive-element indices** — model selects by index, never by invented selector
+- **Clickability scoring** — not a single attribute; handle zero-size overlays and `<label>` shadowing
+- **Watchdogs with `LISTENS_TO`/`EMITS` assertions** — start with crash, popup, download
 - One-action-per-turn loop
 - Post-action verification for every action type (PRD §12.3)
 - Native value setter + `input`/`change` events (PRD §12.4) — **write this test first, against a
