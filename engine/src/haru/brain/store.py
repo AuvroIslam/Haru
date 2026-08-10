@@ -30,6 +30,7 @@ from typing import Iterable, Sequence, TypeVar
 
 from pydantic import BaseModel
 
+from haru.brain.fact_boundary import FactBoundaryOverrides
 from haru.brain.models import (
     DEFAULT_PROFILE_ID,
     Availability,
@@ -75,6 +76,7 @@ SINGLETON_KINDS: dict[type[BaseModel], str] = {
     VoluntaryDisclosure: "voluntary_disclosure",
     StandardAnswers: "standard_answers",
     Preferences: "preferences",
+    FactBoundaryOverrides: "fact_boundary_overrides",
 }
 
 _KIND_TO_RECORD = {v: k for k, v in RECORD_KINDS.items()}
